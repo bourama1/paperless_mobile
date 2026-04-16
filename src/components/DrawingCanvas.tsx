@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { View, StyleSheet, PanResponder, Dimensions } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, StyleSheet, PanResponder } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 interface DrawingCanvasProps {
@@ -10,6 +10,11 @@ export default function DrawingCanvas({ onPathsChange }: DrawingCanvasProps) {
   const [currentPath, setCurrentPath] = useState<string>('');
   const [paths, setPaths] = useState<string[]>([]);
   
+  // Notify parent of changes only when paths array actually updates
+  useEffect(() => {
+    onPathsChange?.(paths);
+  }, [paths]);
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -22,20 +27,13 @@ export default function DrawingCanvas({ onPathsChange }: DrawingCanvasProps) {
         setCurrentPath((prev) => `${prev} L${locationX},${locationY}`);
       },
       onPanResponderRelease: () => {
-        setPaths((prev) => {
-          const newPaths = [...prev, currentPath];
-          onPathsChange?.(newPaths);
-          return newPaths;
-        });
+        if (currentPath) {
+          setPaths((prev) => [...prev, currentPath]);
+        }
         setCurrentPath('');
       },
     })
   ).current;
-
-  const clear = () => {
-    setPaths([]);
-    onPathsChange?.([]);
-  };
 
   return (
     <View style={styles.container} {...panResponder.panHandlers}>
