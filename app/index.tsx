@@ -115,7 +115,7 @@ export default function DocumentListScreen() {
         />
       ) : (
         <View style={styles.center}>
-          <Text variant="bodyLarge">No documents found. Press + to add one.</Text>
+          <Text variant="bodyLarge">No documents found.</Text>
           <FAB
             style={{ marginTop: 20 }}
             icon="refresh"
@@ -125,18 +125,6 @@ export default function DocumentListScreen() {
           />
         </View>
       )}
-      <FAB
-        style={styles.fab}
-        icon="plus"
-        onPress={async () => {
-          console.log('FAB pressed: adding document');
-          try {
-            await apiClient.post('/queue', { filename: 'sample_document.pdf' });
-          } catch (e) {
-            console.error(e);
-          }
-        }}
-      />
     </View>
   );
 }

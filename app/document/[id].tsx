@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Button, Appbar, Snackbar } from 'react-native-paper';
+import { Button, Appbar, Snackbar, SegmentedButtons } from 'react-native-paper';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import * as FileSystem from 'expo-file-system/legacy';
 import apiClient, { BASE_URL } from '../../src/api/client';
@@ -187,7 +187,7 @@ export default function DocumentViewerScreen() {
               currentString = 'M' + point.x + ',' + point.y;
               currentPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
               currentPath.setAttribute('d', currentString);
-              currentPath.setAttribute('stroke', 'red');
+              currentPath.setAttribute('stroke', '#ff5100');
               currentPath.setAttribute('stroke-width', '3');
               currentPath.setAttribute('fill', 'none');
               overlay.appendChild(currentPath);
@@ -217,7 +217,7 @@ export default function DocumentViewerScreen() {
               if (annotation.page !== pageNumber) return;
               const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
               pathEl.setAttribute('d', annotation.d);
-              pathEl.setAttribute('stroke', 'red');
+              pathEl.setAttribute('stroke', '#ff5100');
               pathEl.setAttribute('stroke-width', '3');
               pathEl.setAttribute('fill', 'none');
               overlay.appendChild(pathEl);
@@ -304,28 +304,12 @@ export default function DocumentViewerScreen() {
         <Appbar.BackAction onPress={() => router.back()} />
         <Appbar.Content title={`${filename}`} subtitle={`Version ${version}`} />
         <Appbar.Action
-          icon="check"
+          icon="content-save"
           onPress={() => uploadMutation.mutate()}
-          disabled={uploadMutation.isPending}
+          disabled={uploadMutation.isPending || annotationPaths.length === initialAnnotations.length}
+          color={annotationPaths.length !== initialAnnotations.length ? '#ff5100' : undefined}
         />
       </Appbar.Header>
-
-      <View style={styles.modeToggleRow}>
-        <Button
-          mode={mode === 'navigate' ? 'contained' : 'outlined'}
-          onPress={() => setMode('navigate')}
-          style={styles.modeButton}
-        >
-          Navigate
-        </Button>
-        <Button
-          mode={mode === 'draw' ? 'contained' : 'outlined'}
-          onPress={() => setMode('draw')}
-          style={styles.modeButton}
-        >
-          Draw
-        </Button>
-      </View>
 
       <View style={styles.viewerContainer}>
         {Platform.OS === 'web' ? (
@@ -345,17 +329,27 @@ export default function DocumentViewerScreen() {
       </View>
 
       <View style={styles.footer}>
-        <Button
-          mode="contained"
-          onPress={() => uploadMutation.mutate()}
-          loading={uploadMutation.isPending}
-          icon="content-save-move"
-          disabled={
-            annotationPaths.length === initialAnnotations.length && !uploadMutation.isPending
-          }
-        >
-          Save as New Revision
-        </Button>
+        <SegmentedButtons
+          value={mode}
+          onValueChange={v => setMode(v as 'navigate' | 'draw')}
+          buttons={[
+            {
+              value: 'navigate',
+              label: 'Navigate',
+              icon: 'hand-pointing-up',
+              checkedColor: '#fff',
+              style: mode === 'navigate' ? { backgroundColor: '#ff5100' } : {},
+            },
+            {
+              value: 'draw',
+              label: 'Draw',
+              icon: 'lead-pencil',
+              checkedColor: '#fff',
+              style: mode === 'draw' ? { backgroundColor: '#ff5100' } : {},
+            },
+          ]}
+          style={styles.segmentedButtons}
+        />
       </View>
 
       <Snackbar
@@ -370,19 +364,16 @@ export default function DocumentViewerScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  modeToggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 8,
-    paddingVertical: 10,
-    backgroundColor: '#fafafa',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+  viewerContainer: { flex: 1, position: 'relative', backgroundColor: '#f5f5f5' },
+  footer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 16,
+    borderTopWidth: 1,
+    borderTopColor: '#909090',
+    backgroundColor: '#fff',
   },
-  modeButton: {
-    flex: 1,
-    marginHorizontal: 4,
+  segmentedButtons: {
+    marginBottom: 0,
   },
-  viewerContainer: { flex: 1, position: 'relative', backgroundColor: '#f0f0f0' },
-  footer: { padding: 16, borderTopWidth: 1, borderTopColor: '#e0e0e0' },
 });

@@ -1,4 +1,4 @@
-// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+// Jest Snapshot v1, https://goo.gl/fbAQLP
 
 exports[`DrawingCanvas renders correctly 1`] = `
 <View
@@ -128,7 +128,7 @@ exports[`DrawingCanvas renders with initial paths 1`] = `
         }
         stroke={
           {
-            "payload": 4294901760,
+            "payload": 4294922496,
             "type": 0,
           }
         }

@@ -79,9 +79,9 @@ export default function DrawingCanvas({
     >
       <Svg style={styles.svg}>
         {paths.map((path, index) => (
-          <Path key={index} d={path} stroke="red" strokeWidth={3} fill="none" />
+          <Path key={index} d={path} stroke="#ff5100" strokeWidth={3} fill="none" />
         ))}
-        {currentPath ? <Path d={currentPath} stroke="red" strokeWidth={3} fill="none" /> : null}
+        {currentPath ? <Path d={currentPath} stroke="#ff5100" strokeWidth={3} fill="none" /> : null}
       </Svg>
     </View>
   );
