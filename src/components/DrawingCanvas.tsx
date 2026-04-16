@@ -5,10 +5,18 @@ import Svg, { Path } from "react-native-svg";
 interface DrawingCanvasProps {
     initialPaths?: string[];
     onPathsChange?: (paths: string[]) => void;
-    onSizeChange?: (width: number, height: number) => void; // NEW
+    onSizeChange?: (width: number, height: number) => void;
+    enabled?: boolean;
+    containerPointerEvents?: "auto" | "none";
 }
 
-export default function DrawingCanvas({ initialPaths = [], onPathsChange, onSizeChange }: DrawingCanvasProps) {
+export default function DrawingCanvas({
+    initialPaths = [],
+    onPathsChange,
+    onSizeChange,
+    enabled = true,
+    containerPointerEvents = "auto",
+}: DrawingCanvasProps) {
     const [paths, setPaths] = useState<string[]>(initialPaths);
     const [currentPath, setCurrentPath] = useState<string>("");
     const activePathRef = useRef<string>("");
@@ -31,34 +39,39 @@ export default function DrawingCanvas({ initialPaths = [], onPathsChange, onSize
         onSizeChange?.(width, height);
     };
 
-    const panResponder = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => true,
-            onPanResponderGrant: (evt) => {
-                const { locationX, locationY } = evt.nativeEvent;
-                const startPoint = `M${locationX},${locationY}`;
-                activePathRef.current = startPoint;
-                setCurrentPath(startPoint);
-            },
-            onPanResponderMove: (evt) => {
-                const { locationX, locationY } = evt.nativeEvent;
-                const nextPoint = `${activePathRef.current} L${locationX},${locationY}`;
-                activePathRef.current = nextPoint;
-                setCurrentPath(nextPoint);
-            },
-            onPanResponderRelease: () => {
-                if (activePathRef.current) {
-                    const finishedPath = activePathRef.current;
-                    setPaths((prev) => [...prev, finishedPath]);
-                }
-                activePathRef.current = "";
-                setCurrentPath("");
-            },
-        }),
-    ).current;
+    const panResponder = React.useMemo(
+        () =>
+            PanResponder.create({
+                onStartShouldSetPanResponder: () => enabled,
+                onStartShouldSetPanResponderCapture: () => enabled,
+                onPanResponderGrant: (evt) => {
+                    const { locationX, locationY } = evt.nativeEvent;
+                    const startPoint = `M${locationX},${locationY}`;
+                    activePathRef.current = startPoint;
+                    setCurrentPath(startPoint);
+                },
+                onPanResponderMove: (evt) => {
+                    const { locationX, locationY } = evt.nativeEvent;
+                    const nextPoint = `${activePathRef.current} L${locationX},${locationY}`;
+                    activePathRef.current = nextPoint;
+                    setCurrentPath(nextPoint);
+                },
+                onPanResponderRelease: () => {
+                    if (activePathRef.current) {
+                        const finishedPath = activePathRef.current;
+                        setPaths((prev) => [...prev, finishedPath]);
+                    }
+                    activePathRef.current = "";
+                    setCurrentPath("");
+                },
+            }),
+        [enabled],
+    );
+
+    const panHandlers = enabled ? panResponder.panHandlers : {};
 
     return (
-        <View style={styles.container} {...panResponder.panHandlers} onLayout={handleLayout}>
+        <View style={styles.container} pointerEvents={containerPointerEvents} {...panHandlers} onLayout={handleLayout}>
             <Svg style={styles.svg}>
                 {paths.map((path, index) => (
                     <Path key={index} d={path} stroke="red" strokeWidth={3} fill="none" />
