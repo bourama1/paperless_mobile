@@ -11,7 +11,13 @@ export default function DocumentListScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const { data: documents, isLoading, isError, refetch, isRefetching } = useQuery<Document[]>({
+  const {
+    data: documents,
+    isLoading,
+    isError,
+    refetch,
+    isRefetching,
+  } = useQuery<Document[]>({
     queryKey: ['documents'],
     queryFn: async () => {
       console.log('Fetching documents...');
@@ -34,7 +40,7 @@ export default function DocumentListScreen() {
       console.log('Socket: item updated');
       queryClient.setQueryData(['documents'], (old: Document[] | undefined) => {
         if (!old) return [updatedDoc];
-        return old.map((doc) => (doc.id === updatedDoc.id ? updatedDoc : doc));
+        return old.map(doc => (doc.id === updatedDoc.id ? updatedDoc : doc));
       });
     });
 
@@ -58,12 +64,7 @@ export default function DocumentListScreen() {
     return (
       <View style={styles.center}>
         <Text variant="titleMedium">Error loading documents</Text>
-        <FAB
-          style={{ marginTop: 20 }}
-          icon="refresh"
-          label="Retry"
-          onPress={() => refetch()}
-        />
+        <FAB style={{ marginTop: 20 }} icon="refresh" label="Retry" onPress={() => refetch()} />
       </View>
     );
   }
@@ -72,26 +73,26 @@ export default function DocumentListScreen() {
 
   return (
     <View style={styles.container}>
-      <Stack.Screen 
+      <Stack.Screen
         options={{
           headerRight: () => (
             <Appbar.Action icon="refresh" onPress={() => refetch()} disabled={isRefetching} />
           ),
-        }} 
+        }}
       />
       {documents && documents.length > 0 ? (
         <FlatList
           data={documents}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={item => item.id.toString()}
           onRefresh={refetch}
           refreshing={isRefetching}
           renderItem={({ item }) => (
             <List.Accordion
               title={item.name}
               description={`${item.revisions.length} revision(s)`}
-              left={(props) => <List.Icon {...props} icon="file-pdf-box" />}
+              left={props => <List.Icon {...props} icon="file-pdf-box" />}
             >
-              {item.revisions.map((rev) => (
+              {item.revisions.map(rev => (
                 <List.Item
                   key={rev.id}
                   title={`Version ${rev.version}`}
@@ -99,15 +100,14 @@ export default function DocumentListScreen() {
                   onPress={() => {
                     router.push({
                       pathname: `/document/${item.id}`,
-                      params: { 
-                        filename: rev.filename, 
+                      params: {
+                        filename: rev.filename,
                         version: rev.version,
-                        annotations: rev.annotations 
-                      }
+                        annotations: rev.annotations,
+                      },
                     });
                   }}
-
-                  left={(props) => <List.Icon {...props} icon="history" />}
+                  left={props => <List.Icon {...props} icon="history" />}
                 />
               ))}
             </List.Accordion>

@@ -1,117 +1,117 @@
-import React, { useState, useMemo, useRef, useEffect } from "react";
-import { View, StyleSheet, Platform } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Button, Appbar, Snackbar } from "react-native-paper";
-import { WebView, WebViewMessageEvent } from "react-native-webview";
-import * as FileSystem from "expo-file-system/legacy";
-import apiClient, { BASE_URL } from "../../src/api/client";
-import { Document } from "../../src/types";
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { View, StyleSheet, Platform } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Button, Appbar, Snackbar } from 'react-native-paper';
+import { WebView, WebViewMessageEvent } from 'react-native-webview';
+import * as FileSystem from 'expo-file-system/legacy';
+import apiClient, { BASE_URL } from '../../src/api/client';
+import { Document } from '../../src/types';
 
 type AnnotationPayload = {
-    page: number;
-    width: number;
-    height: number;
-    d: string;
+  page: number;
+  width: number;
+  height: number;
+  d: string;
 };
 
 export default function DocumentViewerScreen() {
-    const { id, filename, version, annotations } = useLocalSearchParams();
-    const router = useRouter();
-    const queryClient = useQueryClient();
-    const webviewRef = useRef<any>(null);
+  const { id, filename, version, annotations } = useLocalSearchParams();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const webviewRef = useRef<any>(null);
 
-    const initialAnnotations = useMemo<AnnotationPayload[]>(() => {
-        try {
-            const raw = annotations ? JSON.parse(annotations as string) : [];
-            if (!Array.isArray(raw)) {
-                return [];
-            }
+  const initialAnnotations = useMemo<AnnotationPayload[]>(() => {
+    try {
+      const raw = annotations ? JSON.parse(annotations as string) : [];
+      if (!Array.isArray(raw)) {
+        return [];
+      }
 
-            if (raw.length === 0) {
-                return [];
-            }
+      if (raw.length === 0) {
+        return [];
+      }
 
-            if (typeof raw[0] === "string") {
-                return (raw as string[]).map((path) => ({ page: 1, width: 0, height: 0, d: path }));
-            }
+      if (typeof raw[0] === 'string') {
+        return (raw as string[]).map(path => ({ page: 1, width: 0, height: 0, d: path }));
+      }
 
-            return (raw as AnnotationPayload[]).map((item) => ({
-                page: item.page || 1,
-                width: item.width || 0,
-                height: item.height || 0,
-                d: item.d || "",
-            }));
-        } catch (e) {
-            return [];
-        }
-    }, [annotations]);
+      return (raw as AnnotationPayload[]).map(item => ({
+        page: item.page || 1,
+        width: item.width || 0,
+        height: item.height || 0,
+        d: item.d || '',
+      }));
+    } catch (e) {
+      return [];
+    }
+  }, [annotations]);
 
-    const [annotationPaths, setAnnotationPaths] = useState<AnnotationPayload[]>(initialAnnotations);
-    const [snackbar, setSnackbar] = useState({ visible: false, message: "" });
-    const [mode, setMode] = useState<"navigate" | "draw">("navigate");
+  const [annotationPaths, setAnnotationPaths] = useState<AnnotationPayload[]>(initialAnnotations);
+  const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
+  const [mode, setMode] = useState<'navigate' | 'draw'>('navigate');
 
-    const uploadMutation = useMutation({
-        mutationFn: async () => {
-            console.log("--- STARTING UPLOAD PROCESS ---");
+  const uploadMutation = useMutation({
+    mutationFn: async () => {
+      console.log('--- STARTING UPLOAD PROCESS ---');
 
-            const documents = queryClient.getQueryData<Document[]>(["documents"]);
-            const currentDoc = documents?.find((d) => d.id === Number(id));
-            const originalName = currentDoc?.name || (filename as string);
+      const documents = queryClient.getQueryData<Document[]>(['documents']);
+      const currentDoc = documents?.find(d => d.id === Number(id));
+      const originalName = currentDoc?.name || (filename as string);
 
-            const pdfUrl = `${BASE_URL}/files/${originalName}`;
-            const localUri = `${FileSystem.cacheDirectory}${originalName}`;
+      const pdfUrl = `${BASE_URL}/files/${originalName}`;
+      const localUri = `${FileSystem.cacheDirectory}${originalName}`;
 
-            console.log(`[Upload] Step 1: Downloading original PDF from ${pdfUrl}...`);
-            const downloadResult = await FileSystem.downloadAsync(pdfUrl, localUri);
+      console.log(`[Upload] Step 1: Downloading original PDF from ${pdfUrl}...`);
+      const downloadResult = await FileSystem.downloadAsync(pdfUrl, localUri);
 
-            if (downloadResult.status !== 200) {
-                throw new Error(`Failed to download original PDF (Status: ${downloadResult.status})`);
-            }
-            console.log(`[Upload] Step 2: Downloaded to ${downloadResult.uri}`);
+      if (downloadResult.status !== 200) {
+        throw new Error(`Failed to download original PDF (Status: ${downloadResult.status})`);
+      }
+      console.log(`[Upload] Step 2: Downloaded to ${downloadResult.uri}`);
 
-            const formData = new FormData();
+      const formData = new FormData();
 
-            if (Platform.OS !== "web") {
-                const file = {
-                    uri: downloadResult.uri,
-                    name: originalName,
-                    type: "application/pdf",
-                } as any;
-                formData.append("file", file);
-            } else {
-                const blob = new Blob(["dummy"], { type: "application/pdf" });
-                formData.append("file", blob, originalName);
-            }
+      if (Platform.OS !== 'web') {
+        const file = {
+          uri: downloadResult.uri,
+          name: originalName,
+          type: 'application/pdf',
+        } as any;
+        formData.append('file', file);
+      } else {
+        const blob = new Blob(['dummy'], { type: 'application/pdf' });
+        formData.append('file', blob, originalName);
+      }
 
-            formData.append("annotations", JSON.stringify(annotationPaths));
-            formData.append("canvasWidth", annotationPaths[0]?.width?.toString() || "0");
-            formData.append("canvasHeight", annotationPaths[0]?.height?.toString() || "0");
+      formData.append('annotations', JSON.stringify(annotationPaths));
+      formData.append('canvasWidth', annotationPaths[0]?.width?.toString() || '0');
+      formData.append('canvasHeight', annotationPaths[0]?.height?.toString() || '0');
 
-            const response = await apiClient.post(`/files/${id}/revise`, formData, {
-                headers: { "Content-Type": "multipart/form-data" },
-                transformRequest: (data) => data,
-                timeout: 60000,
-            });
+      const response = await apiClient.post(`/files/${id}/revise`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        transformRequest: data => data,
+        timeout: 60000,
+      });
 
-            return response.data;
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["documents"] });
-            setSnackbar({ visible: true, message: "Revision saved successfully!" });
-            setTimeout(() => router.back(), 1500);
-        },
-        onError: (error: any) => {
-            const errorMsg = error?.response?.data?.error || error.message;
-            setSnackbar({ visible: true, message: `Save failed: ${errorMsg}` });
-        },
-    });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      setSnackbar({ visible: true, message: 'Revision saved successfully!' });
+      setTimeout(() => router.back(), 1500);
+    },
+    onError: (error: any) => {
+      const errorMsg = error?.response?.data?.error || error.message;
+      setSnackbar({ visible: true, message: `Save failed: ${errorMsg}` });
+    },
+  });
 
-    const pdfUrl = `${BASE_URL}/files/${filename}`;
+  const pdfUrl = `${BASE_URL}/files/${filename}`;
 
-    const pdfHtml = useMemo(() => {
-        const encodedAnnotations = JSON.stringify(initialAnnotations);
-        return `
+  const pdfHtml = useMemo(() => {
+    const encodedAnnotations = JSON.stringify(initialAnnotations);
+    return `
     <html>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
@@ -279,101 +279,110 @@ export default function DocumentViewerScreen() {
       </body>
     </html>
   `;
-    }, [pdfUrl, initialAnnotations]);
+  }, [pdfUrl, initialAnnotations]);
 
-    const handleWebViewMessage = (event: WebViewMessageEvent) => {
-        try {
-            const msg = JSON.parse(event.nativeEvent.data);
-            if (msg.type === "ANNOTATIONS") {
-                setAnnotationPaths(msg.annotations || []);
-            }
-        } catch (e) {
-            // ignore non-JSON messages
-        }
-    };
+  const handleWebViewMessage = (event: WebViewMessageEvent) => {
+    try {
+      const msg = JSON.parse(event.nativeEvent.data);
+      if (msg.type === 'ANNOTATIONS') {
+        setAnnotationPaths(msg.annotations || []);
+      }
+    } catch (e) {
+      // ignore non-JSON messages
+    }
+  };
 
-    useEffect(() => {
-        if (webviewRef.current) {
-            webviewRef.current.postMessage(JSON.stringify({ type: "SET_MODE", mode }));
-        }
-    }, [mode]);
+  useEffect(() => {
+    if (webviewRef.current) {
+      webviewRef.current.postMessage(JSON.stringify({ type: 'SET_MODE', mode }));
+    }
+  }, [mode]);
 
-    return (
-        <View style={styles.container}>
-            <Appbar.Header>
-                <Appbar.BackAction onPress={() => router.back()} />
-                <Appbar.Content title={`${filename}`} subtitle={`Version ${version}`} />
-                <Appbar.Action
-                    icon="check"
-                    onPress={() => uploadMutation.mutate()}
-                    disabled={uploadMutation.isPending}
-                />
-            </Appbar.Header>
+  return (
+    <View style={styles.container}>
+      <Appbar.Header>
+        <Appbar.BackAction onPress={() => router.back()} />
+        <Appbar.Content title={`${filename}`} subtitle={`Version ${version}`} />
+        <Appbar.Action
+          icon="check"
+          onPress={() => uploadMutation.mutate()}
+          disabled={uploadMutation.isPending}
+        />
+      </Appbar.Header>
 
-            <View style={styles.modeToggleRow}>
-                <Button
-                    mode={mode === "navigate" ? "contained" : "outlined"}
-                    onPress={() => setMode("navigate")}
-                    style={styles.modeButton}>
-                    Navigate
-                </Button>
-                <Button
-                    mode={mode === "draw" ? "contained" : "outlined"}
-                    onPress={() => setMode("draw")}
-                    style={styles.modeButton}>
-                    Draw
-                </Button>
-            </View>
+      <View style={styles.modeToggleRow}>
+        <Button
+          mode={mode === 'navigate' ? 'contained' : 'outlined'}
+          onPress={() => setMode('navigate')}
+          style={styles.modeButton}
+        >
+          Navigate
+        </Button>
+        <Button
+          mode={mode === 'draw' ? 'contained' : 'outlined'}
+          onPress={() => setMode('draw')}
+          style={styles.modeButton}
+        >
+          Draw
+        </Button>
+      </View>
 
-            <View style={styles.viewerContainer}>
-                {Platform.OS === "web" ?
-                    <iframe src={pdfUrl} style={{ width: "100%", height: "100%", border: "none" }} />
-                :   <WebView
-                        ref={webviewRef}
-                        source={{ html: pdfHtml }}
-                        style={{ flex: 1 }}
-                        originWhitelist={["*"]}
-                        javaScriptEnabled={true}
-                        scrollEnabled={true}
-                        scalesPageToFit={true}
-                        onMessage={handleWebViewMessage}
-                    />
-                }
-            </View>
+      <View style={styles.viewerContainer}>
+        {Platform.OS === 'web' ? (
+          <iframe src={pdfUrl} style={{ width: '100%', height: '100%', border: 'none' }} />
+        ) : (
+          <WebView
+            ref={webviewRef}
+            source={{ html: pdfHtml }}
+            style={{ flex: 1 }}
+            originWhitelist={['*']}
+            javaScriptEnabled={true}
+            scrollEnabled={true}
+            scalesPageToFit={true}
+            onMessage={handleWebViewMessage}
+          />
+        )}
+      </View>
 
-            <View style={styles.footer}>
-                <Button
-                    mode="contained"
-                    onPress={() => uploadMutation.mutate()}
-                    loading={uploadMutation.isPending}
-                    icon="content-save-move"
-                    disabled={annotationPaths.length === initialAnnotations.length && !uploadMutation.isPending}>
-                    Save as New Revision
-                </Button>
-            </View>
+      <View style={styles.footer}>
+        <Button
+          mode="contained"
+          onPress={() => uploadMutation.mutate()}
+          loading={uploadMutation.isPending}
+          icon="content-save-move"
+          disabled={
+            annotationPaths.length === initialAnnotations.length && !uploadMutation.isPending
+          }
+        >
+          Save as New Revision
+        </Button>
+      </View>
 
-            <Snackbar visible={snackbar.visible} onDismiss={() => setSnackbar({ ...snackbar, visible: false })}>
-                {snackbar.message}
-            </Snackbar>
-        </View>
-    );
+      <Snackbar
+        visible={snackbar.visible}
+        onDismiss={() => setSnackbar({ ...snackbar, visible: false })}
+      >
+        {snackbar.message}
+      </Snackbar>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#fff" },
-    modeToggleRow: {
-        flexDirection: "row",
-        justifyContent: "space-around",
-        paddingHorizontal: 8,
-        paddingVertical: 10,
-        backgroundColor: "#fafafa",
-        borderBottomWidth: 1,
-        borderBottomColor: "#e0e0e0",
-    },
-    modeButton: {
-        flex: 1,
-        marginHorizontal: 4,
-    },
-    viewerContainer: { flex: 1, position: "relative", backgroundColor: "#f0f0f0" },
-    footer: { padding: 16, borderTopWidth: 1, borderTopColor: "#e0e0e0" },
+  container: { flex: 1, backgroundColor: '#fff' },
+  modeToggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 8,
+    paddingVertical: 10,
+    backgroundColor: '#fafafa',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  modeButton: {
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  viewerContainer: { flex: 1, position: 'relative', backgroundColor: '#f0f0f0' },
+  footer: { padding: 16, borderTopWidth: 1, borderTopColor: '#e0e0e0' },
 });
