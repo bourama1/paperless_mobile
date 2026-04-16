@@ -3,6 +3,7 @@ export interface Revision {
   document_id: number;
   filename: string;
   version: number;
+  annotations?: string; // JSON string of SVG paths
   created_at: string;
 }
 

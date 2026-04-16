@@ -99,9 +99,14 @@ export default function DocumentListScreen() {
                   onPress={() => {
                     router.push({
                       pathname: `/document/${item.id}`,
-                      params: { filename: rev.filename, version: rev.version }
+                      params: { 
+                        filename: rev.filename, 
+                        version: rev.version,
+                        annotations: rev.annotations 
+                      }
                     });
                   }}
+
                   left={(props) => <List.Icon {...props} icon="history" />}
                 />
               ))}

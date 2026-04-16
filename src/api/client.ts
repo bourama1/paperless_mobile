@@ -11,7 +11,7 @@ export const BASE_URL = `http://${ip}:3000`;
 const apiClient = axios.create({
   baseURL: BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
+    'Accept': 'application/json',
   },
 });
 
