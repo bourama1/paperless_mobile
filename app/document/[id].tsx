@@ -21,9 +21,8 @@ export default function DocumentViewerScreen() {
       // On mobile, we need to provide a real-looking file object.
       // For this prototype, we'll create a small blob.
       if (Platform.OS !== 'web') {
-        const dummyContent = 'PDF placeholder content';
-        // Base64 encoding for mobile
-        const base64Content = Buffer.from(dummyContent).toString('base64');
+        // Base64 for "PDF placeholder content"
+        const base64Content = 'UERGIHBsYWNlaG9sZGVyIGNvbnRlbnQ=';
         const file = {
           uri: `data:application/pdf;base64,${base64Content}`,
           name: filename as string,
