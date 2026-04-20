@@ -135,7 +135,7 @@ export default function DocumentViewerScreen() {
 
           const viewer = document.getElementById('viewer');
           let currentMode = 'navigate';
-          const annotations = Array.isArray(initialAnnotations) ? initialAnnotations : [];
+          let annotations = Array.isArray(initialAnnotations) ? JSON.parse(JSON.stringify(initialAnnotations)) : [];
 
           const sendAnnotations = () => {
             window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ANNOTATIONS', annotations }));
@@ -146,6 +146,30 @@ export default function DocumentViewerScreen() {
             document.body.style.touchAction = mode === 'draw' ? 'none' : 'pan-x pan-y pinch-zoom';
             document.querySelectorAll('.page-overlay').forEach((overlay) => {
               overlay.style.pointerEvents = mode === 'draw' ? 'auto' : 'none';
+            });
+          };
+
+          const undo = () => {
+            if (annotations.length > initialAnnotations.length) {
+              annotations.pop();
+              refreshOverlays();
+              sendAnnotations();
+            }
+          };
+
+          const clear = () => {
+            annotations = JSON.parse(JSON.stringify(initialAnnotations));
+            refreshOverlays();
+            sendAnnotations();
+          };
+
+          const refreshOverlays = () => {
+            document.querySelectorAll('.page-overlay').forEach(overlay => {
+              const pageNumber = parseInt(overlay.getAttribute('data-page'));
+              while (overlay.firstChild) {
+                overlay.removeChild(overlay.firstChild);
+              }
+              renderSavedAnnotations(overlay, pageNumber);
             });
           };
 
@@ -263,6 +287,10 @@ export default function DocumentViewerScreen() {
               const msg = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
               if (msg.type === 'SET_MODE') {
                 setMode(msg.mode);
+              } else if (msg.type === 'UNDO') {
+                undo();
+              } else if (msg.type === 'CLEAR') {
+                clear();
               }
             } catch (error) {
               // ignore
@@ -304,9 +332,29 @@ export default function DocumentViewerScreen() {
         <Appbar.BackAction onPress={() => router.back()} />
         <Appbar.Content title={`${filename}`} subtitle={`Version ${version}`} />
         <Appbar.Action
+          icon="undo"
+          onPress={() => {
+            if (webviewRef.current) {
+              webviewRef.current.postMessage(JSON.stringify({ type: 'UNDO' }));
+            }
+          }}
+          disabled={annotationPaths.length <= initialAnnotations.length}
+        />
+        <Appbar.Action
+          icon="delete-sweep"
+          onPress={() => {
+            if (webviewRef.current) {
+              webviewRef.current.postMessage(JSON.stringify({ type: 'CLEAR' }));
+            }
+          }}
+          disabled={annotationPaths.length === initialAnnotations.length}
+        />
+        <Appbar.Action
           icon="content-save"
           onPress={() => uploadMutation.mutate()}
-          disabled={uploadMutation.isPending || annotationPaths.length === initialAnnotations.length}
+          disabled={
+            uploadMutation.isPending || annotationPaths.length === initialAnnotations.length
+          }
           color={annotationPaths.length !== initialAnnotations.length ? '#ff5100' : undefined}
         />
       </Appbar.Header>

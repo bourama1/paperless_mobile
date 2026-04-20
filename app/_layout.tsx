@@ -36,7 +36,10 @@ export default function RootLayout() {
             }}
           >
             <Stack.Screen name="index" options={{ title: 'Document Library' }} />
-            <Stack.Screen name="document/[id]" options={{ title: 'Document View', headerShown: false }} />
+            <Stack.Screen
+              name="document/[id]"
+              options={{ title: 'Document View', headerShown: false }}
+            />
           </Stack>
         </PaperProvider>
       </SafeAreaProvider>
