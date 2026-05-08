@@ -12,7 +12,7 @@
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
     "@tanstack/react-query": "^5.99.0",
-    "axios": "^1.15.0",
+    "axios": "^1.15.2",
     "expo": "~54.0.33",
     "expo-constants": "~18.0.13",
     "expo-file-system": "~19.0.21",
