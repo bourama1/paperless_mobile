@@ -26,16 +26,12 @@ export default function RootLayout() {
         <PaperProvider theme={theme}>
           <Stack
             screenOptions={{
-              headerStyle: {
-                backgroundColor: '#fff',
-              },
+              headerStyle: { backgroundColor: '#fff' },
               headerTintColor: '#ff5100',
-              headerTitleStyle: {
-                fontWeight: 'bold',
-              },
+              headerTitleStyle: { fontWeight: 'bold' },
             }}
           >
-            <Stack.Screen name="index" options={{ title: 'Document Library' }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen
               name="document/[id]"
               options={{ title: 'Document View', headerShown: false }}

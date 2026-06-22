@@ -21,3 +21,31 @@ export interface Annotation {
   color: string;
   strokeWidth: number;
 }
+
+export interface WorkstationOrder {
+  _id: string;
+  position: string;
+  productOrder: string;
+  projectNumber: string;
+  salesOrder: string;
+  schedule: string;
+  type: string;
+  createdAt: string;
+  customer: string;
+  customerDesc: string;
+  filename: string;
+  maxCycle: number;
+  productDesc: string;
+  quantity: number;
+  updatedAt: string;
+  workplace: string;
+}
+
+export interface Workstation {
+  id: number;
+  name: string;
+  current_order_id: string | null;
+  current_order_data: WorkstationOrder | null;
+  is_active: number;
+  last_polled_at: string | null;
+}

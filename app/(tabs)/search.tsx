@@ -1,0 +1,167 @@
+import React, { useState } from 'react';
+import { FlatList, View, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  Card, Text, ActivityIndicator, FAB, TextInput, Button, Divider, Snackbar,
+} from 'react-native-paper';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
+import apiClient from '../../src/api/client';
+
+interface SearchResult {
+  customer_code: number;
+  order_code: number;
+  position_code: number;
+}
+
+export default function SearchScreen() {
+  const router = useRouter();
+  const [orderCode, setOrderCode] = useState('');
+  const [snackbar, setSnackbar] = useState({ visible: false, message: '' });
+
+  const {
+    data: results,
+    isLoading,
+    isError,
+    refetch,
+    isRefetching,
+  } = useQuery<SearchResult[]>({
+    queryKey: ['search-pbom', orderCode],
+    queryFn: async () => {
+      const response = await apiClient.get('/workstations/search-pbom', {
+        params: { order_code: orderCode },
+      });
+      return response.data;
+    },
+    enabled: false,
+  });
+
+  const importPbom = useMutation({
+    mutationFn: async (item: SearchResult) => {
+      const response = await apiClient.post('/workstations/import-pbom', {
+        salesOrder: String(item.order_code),
+        position: String(item.position_code),
+        customer: String(item.customer_code),
+      });
+      return response.data;
+    },
+    onSuccess: (doc) => {
+      const rev = doc.revisions?.[0];
+      router.push({
+        pathname: `/document/${doc.id}`,
+        params: {
+          filename: rev?.filename || '',
+          version: rev?.version || 1,
+          annotations: rev?.annotations || '',
+        },
+      });
+    },
+    onError: (error: any) => {
+      const msg = error?.response?.data?.error || error.message;
+      setSnackbar({ visible: true, message: `Failed: ${msg}` });
+    },
+  });
+
+  const handleSearch = () => {
+    if (!orderCode.trim()) return;
+    refetch();
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.searchBar}>
+        <TextInput
+          mode="outlined"
+          label="Order Code"
+          value={orderCode}
+          onChangeText={setOrderCode}
+          style={styles.input}
+          onSubmitEditing={handleSearch}
+          returnKeyType="search"
+        />
+        <Button
+          mode="contained"
+          onPress={handleSearch}
+          loading={isRefetching}
+          disabled={!orderCode.trim() || isRefetching}
+          style={styles.searchBtn}
+          buttonColor="#ff5100"
+        >
+          Search
+        </Button>
+      </View>
+
+      <Divider />
+
+      {isLoading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" />
+        </View>
+      ) : isError ? (
+        <View style={styles.center}>
+          <Text variant="titleMedium">Search failed</Text>
+          <FAB style={{ marginTop: 20 }} icon="refresh" label="Retry" onPress={handleSearch} />
+        </View>
+      ) : results && results.length > 0 ? (
+        <FlatList
+          data={results}
+          keyExtractor={(item, i) => `${item.order_code}-${item.position_code}-${i}`}
+          contentContainerStyle={styles.list}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              onPress={() => importPbom.mutate(item)}
+              disabled={importPbom.isPending}
+              activeOpacity={0.7}
+            >
+              <Card style={styles.card} mode="outlined">
+                <Card.Title
+                  title={`Order ${item.order_code}`}
+                  titleStyle={styles.cardTitle}
+                  subtitle={`Position ${item.position_code}`}
+                />
+              </Card>
+            </TouchableOpacity>
+          )}
+        />
+      ) : results ? (
+        <View style={styles.center}>
+          <Text variant="bodyLarge">No positions found for this order.</Text>
+          <Text variant="bodySmall" style={{ color: '#999', marginTop: 8 }}>
+            Try a different order code
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.center}>
+          <Text variant="bodyLarge">Enter an order code to search</Text>
+          <Text variant="bodySmall" style={{ color: '#999', marginTop: 8 }}>
+            PBOM Hardware documents per position will be opened
+          </Text>
+        </View>
+      )}
+
+      <Snackbar
+        visible={snackbar.visible}
+        onDismiss={() => setSnackbar({ ...snackbar, visible: false })}
+      >
+        {snackbar.message}
+      </Snackbar>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#fff' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  searchBar: {
+    flexDirection: 'row',
+    padding: 12,
+    alignItems: 'center',
+    gap: 8,
+  },
+  input: { flex: 1 },
+  searchBtn: { height: 52, borderRadius: 4 },
+  list: { padding: 12 },
+  card: { marginBottom: 12 },
+  cardTitle: { fontWeight: 'bold' },
+  detailRow: { flexDirection: 'row', marginTop: 4 },
+  label: { fontWeight: '600', width: 100, color: '#666' },
+});
