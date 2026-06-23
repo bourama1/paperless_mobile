@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { FlatList, View, StyleSheet, TouchableOpacity } from 'react-native';
+import { FlatList, View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import {
-  Card, Text, ActivityIndicator, FAB, TextInput, Button, Divider, Snackbar,
+  Card, Text, TextInput, Divider, Snackbar,
 } from 'react-native-paper';
+import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import apiClient from '../../src/api/client';
@@ -78,17 +79,26 @@ export default function SearchScreen() {
           onSubmitEditing={handleSearch}
           returnKeyType="search"
         />
-        <Button
-          mode="outlined"
+        <TouchableOpacity
           onPress={handleSearch}
-          loading={isRefetching}
           disabled={!orderCode.trim() || isRefetching}
-          style={styles.searchBtn}
-          textColor="#ff5100"
-          buttonColor="#fff"
+          activeOpacity={0.8}
+          style={[
+            styles.searchBtn,
+            orderCode.trim() && !isRefetching ? styles.searchBtnActive : styles.searchBtnDisabled,
+          ]}
         >
-          Hledat
-        </Button>
+          {isRefetching ? (
+            <ActivityIndicator size="small" color={orderCode.trim() ? '#fff' : '#999'} />
+          ) : (
+            <Text style={[
+              styles.searchBtnText,
+              { color: orderCode.trim() ? '#fff' : '#999' },
+            ]}>
+              Hledat
+            </Text>
+          )}
+        </TouchableOpacity>
       </View>
 
       <Divider />
@@ -100,7 +110,13 @@ export default function SearchScreen() {
       ) : isError ? (
         <View style={styles.center}>
           <Text variant="titleMedium">Hledání selhalo</Text>
-          <FAB style={{ marginTop: 20 }} icon="refresh" label="Znovu" onPress={handleSearch} />
+          <TouchableOpacity
+            style={[styles.pillBtn, styles.pillBtnPrimary]}
+            activeOpacity={0.8}
+            onPress={handleSearch}
+          >
+            <Text style={styles.pillBtnText}>Znovu</Text>
+          </TouchableOpacity>
         </View>
       ) : results && results.length > 0 ? (
         <FlatList
@@ -113,11 +129,14 @@ export default function SearchScreen() {
               disabled={importPbom.isPending}
               activeOpacity={0.7}
             >
-              <Card style={styles.card} mode="outlined">
+              <Card style={[styles.card, { borderColor: '#ff5100' }]} mode="outlined">
                 <Card.Title
                   title={`Zakázka ${item.order_code}`}
                   titleStyle={styles.cardTitle}
                   subtitle={`Pozice ${item.position_code}`}
+                  right={props => (
+                    <Ionicons name="chevron-forward" size={20} color="#ccc" style={{ marginRight: 12 }} />
+                  )}
                 />
               </Card>
             </TouchableOpacity>
@@ -159,7 +178,42 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   input: { flex: 1 },
-  searchBtn: { borderRadius: 20, paddingHorizontal: 16 },
+  searchBtn: {
+    borderRadius: 20,
+    paddingHorizontal: 20,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  searchBtnActive: {
+    backgroundColor: '#ff5100',
+  },
+  searchBtnDisabled: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  searchBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pillBtn: {
+    marginTop: 20,
+    borderRadius: 20,
+    paddingHorizontal: 24,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pillBtnPrimary: {
+    backgroundColor: '#ff5100',
+  },
+  pillBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   list: { padding: 12 },
   card: { marginBottom: 12 },
   cardTitle: { fontWeight: 'bold' },

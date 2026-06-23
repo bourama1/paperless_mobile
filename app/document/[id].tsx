@@ -193,7 +193,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
             <View style={styles.viewerContainer}>
                 {mode === "view" ?
                     <WebView
-                        source={{ html: getPdfViewerHtml(pdfUrl) }}
+                        source={{ html: getPdfViewerHtml(pdfUrl, filename as string) }}
                         style={{ flex: 1 }}
                         originWhitelist={["*"]}
                         javaScriptEnabled={true}
@@ -225,7 +225,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
     );
 }
 
-function getPdfViewerHtml(url: string) {
+function getPdfViewerHtml(url: string, docName: string) {
     return `
 <!DOCTYPE html>
 <html>
@@ -235,16 +235,19 @@ function getPdfViewerHtml(url: string) {
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #525659; }
+    body { background: #525659; font-family: sans-serif; }
     #viewer { width: 100%; }
     .page { display: flex; justify-content: center; margin-bottom: 8px; }
     .page canvas { box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
-    .error { color: #fff; text-align: center; padding: 40px 20px; font-family: sans-serif; font-size: 16px; }
-    .loading { color: #aaa; text-align: center; padding: 40px 20px; font-family: sans-serif; font-size: 16px; }
+    .error { color: #fff; text-align: center; padding: 40px 20px; font-size: 16px; }
+    .loading-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; gap:16px; }
+    .spinner { width:32px; height:32px; border:3px solid rgba(255,255,255,0.15); border-top-color:#ff5100; border-radius:50%; animation:spin .8s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .loading-name { color:#aaa; font-size:13px; text-align:center; }
   </style>
 </head>
 <body>
-  <div id="viewer"><div class="loading">Načítání PDF...</div></div>
+  <div id="viewer"><div class="loading-wrap"><div class="spinner"></div><div class="loading-name">Načítání PDF...<br>${docName}</div></div></div>
   <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     pdfjsLib.getDocument('${url}').promise.then(function(pdf) {

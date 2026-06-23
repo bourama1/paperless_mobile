@@ -1,13 +1,15 @@
-import React, { useCallback } from 'react';
-import { FlatList, View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Card, Text, ActivityIndicator, FAB, Appbar, Chip, Divider } from 'react-native-paper';
+import React, { useCallback, useLayoutEffect } from 'react';
+import { FlatList, View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Card, Text, Chip, Divider } from 'react-native-paper';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter, useNavigation } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import apiClient from '../../src/api/client';
 import { Workstation } from '../../src/types';
 
 export default function WorkstationsScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
 
   const {
     data: workstations,
@@ -55,6 +57,20 @@ export default function WorkstationsScreen() {
 
   const sorted = workstations?.slice().sort((a, b) => a.name.localeCompare(b.name));
 
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity onPress={() => refetch()} disabled={isRefetching} style={{ marginRight: 16 }}>
+          {isRefetching ? (
+            <ActivityIndicator size="small" color="#ff5100" />
+          ) : (
+            <Ionicons name="refresh" size={22} color="#ff5100" />
+          )}
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, refetch]);
+
   if (isLoading && !isRefetching) {
     return (
       <View style={styles.center}>
@@ -67,7 +83,13 @@ export default function WorkstationsScreen() {
     return (
       <View style={styles.center}>
         <Text variant="titleMedium">Chyba při načítání pracovišť</Text>
-        <FAB style={{ marginTop: 20 }} icon="refresh" label="Znovu" onPress={() => refetch()} />
+        <TouchableOpacity
+          style={[styles.pillBtn, styles.pillBtnPrimary]}
+          activeOpacity={0.8}
+          onPress={() => refetch()}
+        >
+          <Text style={styles.pillBtnText}>Znovu</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -91,7 +113,10 @@ export default function WorkstationsScreen() {
               disabled={importPbom.isPending}
               activeOpacity={0.7}
             >
-              <Card style={styles.card} mode="outlined">
+              <Card
+                  style={[styles.card, item.current_order_id && { borderColor: '#ff5100' }]}
+                  mode="outlined"
+                >
                 <Card.Title
                   title={item.name}
                   titleStyle={styles.cardTitle}
@@ -161,13 +186,18 @@ export default function WorkstationsScreen() {
       ) : (
         <View style={styles.center}>
           <Text variant="bodyLarge">Nenalezena žádná pracoviště.</Text>
-          <FAB
-            style={{ marginTop: 20 }}
-            icon="refresh"
-            label="Obnovit"
+          <TouchableOpacity
+            style={[styles.pillBtn, styles.pillBtnPrimary]}
+            activeOpacity={0.8}
             onPress={() => refetch()}
-            loading={isRefetching}
-          />
+            disabled={isRefetching}
+          >
+            {isRefetching ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.pillBtnText}>Obnovit</Text>
+            )}
+          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -183,4 +213,20 @@ const styles = StyleSheet.create({
   detailRow: { flexDirection: 'row', marginTop: 4 },
   label: { fontWeight: '600', width: 100, color: '#666' },
   value: { flex: 1 },
+  pillBtn: {
+    marginTop: 20,
+    borderRadius: 20,
+    paddingHorizontal: 24,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pillBtnPrimary: {
+    backgroundColor: '#ff5100',
+  },
+  pillBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });
