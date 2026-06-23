@@ -66,8 +66,8 @@ export default function WorkstationsScreen() {
   if (isError) {
     return (
       <View style={styles.center}>
-        <Text variant="titleMedium">Error loading workstations</Text>
-        <FAB style={{ marginTop: 20 }} icon="refresh" label="Retry" onPress={() => refetch()} />
+        <Text variant="titleMedium">Chyba při načítání pracovišť</Text>
+        <FAB style={{ marginTop: 20 }} icon="refresh" label="Znovu" onPress={() => refetch()} />
       </View>
     );
   }
@@ -108,7 +108,7 @@ export default function WorkstationsScreen() {
                         fontSize: 12,
                       }}
                     >
-                      {item.current_order_id ? 'BUSY' : 'FREE'}
+                      {item.current_order_id ? 'OBSAZENO' : 'VOLNO'}
                     </Chip>
                   )}
                 />
@@ -118,40 +118,40 @@ export default function WorkstationsScreen() {
                     <Text variant="titleMedium">
                       {item.current_order_data.productDesc}
                     </Text>
-                    {item.current_order_data.productOrder ? (
-                      <View style={styles.detailRow}>
-                        <Text variant="bodySmall" style={styles.label}>Order:</Text>
-                        <Text variant="bodySmall" style={styles.value} numberOfLines={1}>{item.current_order_data.productOrder}</Text>
-                      </View>
-                    ) : null}
                     {item.current_order_data.salesOrder ? (
                       <View style={styles.detailRow}>
-                        <Text variant="bodySmall" style={styles.label}>Sales Order:</Text>
+                        <Text variant="bodySmall" style={styles.label}>Zakázka:</Text>
                         <Text variant="bodySmall" style={styles.value} numberOfLines={1}>{item.current_order_data.salesOrder}</Text>
+                      </View>
+                    ) : null}
+                    {item.current_order_data.projectNumber ? (
+                      <View style={styles.detailRow}>
+                        <Text variant="bodySmall" style={styles.label}>Projekt:</Text>
+                        <Text variant="bodySmall" style={styles.value} numberOfLines={1}>{item.current_order_data.projectNumber}</Text>
                       </View>
                     ) : null}
                     {item.current_order_data.position ? (
                       <View style={styles.detailRow}>
-                        <Text variant="bodySmall" style={styles.label}>Position:</Text>
+                        <Text variant="bodySmall" style={styles.label}>Pozice:</Text>
                         <Text variant="bodySmall" style={styles.value}>{item.current_order_data.position}</Text>
                       </View>
                     ) : null}
                     {item.current_order_data.customerDesc ? (
                       <View style={styles.detailRow}>
-                        <Text variant="bodySmall" style={styles.label}>Customer:</Text>
+                        <Text variant="bodySmall" style={styles.label}>Zákazník:</Text>
                         <Text variant="bodySmall" style={styles.value} numberOfLines={1}>{item.current_order_data.customerDesc}</Text>
                       </View>
                     ) : null}
                     {item.current_order_data.quantity > 1 && (
                       <View style={styles.detailRow}>
-                        <Text variant="bodySmall" style={styles.label}>Quantity:</Text>
+                        <Text variant="bodySmall" style={styles.label}>Množství:</Text>
                         <Text variant="bodySmall" style={styles.value}>{item.current_order_data.quantity}</Text>
                       </View>
                     )}
                   </Card.Content>
                 ) : (
                   <Card.Content>
-                    <Text variant="bodyMedium" style={{ color: '#999' }}>No active order</Text>
+                    <Text variant="bodyMedium" style={{ color: '#999' }}>Žádná aktivní zakázka</Text>
                   </Card.Content>
                 )}
               </Card>
@@ -160,11 +160,11 @@ export default function WorkstationsScreen() {
         />
       ) : (
         <View style={styles.center}>
-          <Text variant="bodyLarge">No workstations found.</Text>
+          <Text variant="bodyLarge">Nenalezena žádná pracoviště.</Text>
           <FAB
             style={{ marginTop: 20 }}
             icon="refresh"
-            label="Reload"
+            label="Obnovit"
             onPress={() => refetch()}
             loading={isRefetching}
           />

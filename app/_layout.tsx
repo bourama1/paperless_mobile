@@ -34,7 +34,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen
               name="document/[id]"
-              options={{ title: 'Document View', headerShown: false }}
+              options={{ title: 'Dokument', headerShown: false }}
             />
           </Stack>
         </PaperProvider>

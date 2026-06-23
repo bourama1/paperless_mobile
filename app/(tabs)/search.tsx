@@ -38,7 +38,7 @@ export default function SearchScreen() {
   const importPbom = useMutation({
     mutationFn: async (item: SearchResult) => {
       const response = await apiClient.post('/workstations/import-pbom', {
-        salesOrder: String(item.order_code),
+        projectNumber: String(item.order_code),
         position: String(item.position_code),
         customer: String(item.customer_code),
       });
@@ -57,7 +57,7 @@ export default function SearchScreen() {
     },
     onError: (error: any) => {
       const msg = error?.response?.data?.error || error.message;
-      setSnackbar({ visible: true, message: `Failed: ${msg}` });
+      setSnackbar({ visible: true, message: `Chyba: ${msg}` });
     },
   });
 
@@ -71,7 +71,7 @@ export default function SearchScreen() {
       <View style={styles.searchBar}>
         <TextInput
           mode="outlined"
-          label="Order Code"
+          label="Kód zakázky"
           value={orderCode}
           onChangeText={setOrderCode}
           style={styles.input}
@@ -86,7 +86,7 @@ export default function SearchScreen() {
           style={styles.searchBtn}
           buttonColor="#ff5100"
         >
-          Search
+          Hledat
         </Button>
       </View>
 
@@ -98,8 +98,8 @@ export default function SearchScreen() {
         </View>
       ) : isError ? (
         <View style={styles.center}>
-          <Text variant="titleMedium">Search failed</Text>
-          <FAB style={{ marginTop: 20 }} icon="refresh" label="Retry" onPress={handleSearch} />
+          <Text variant="titleMedium">Hledání selhalo</Text>
+          <FAB style={{ marginTop: 20 }} icon="refresh" label="Znovu" onPress={handleSearch} />
         </View>
       ) : results && results.length > 0 ? (
         <FlatList
@@ -114,9 +114,9 @@ export default function SearchScreen() {
             >
               <Card style={styles.card} mode="outlined">
                 <Card.Title
-                  title={`Order ${item.order_code}`}
+                  title={`Zakázka ${item.order_code}`}
                   titleStyle={styles.cardTitle}
-                  subtitle={`Position ${item.position_code}`}
+                  subtitle={`Pozice ${item.position_code}`}
                 />
               </Card>
             </TouchableOpacity>
@@ -124,16 +124,16 @@ export default function SearchScreen() {
         />
       ) : results ? (
         <View style={styles.center}>
-          <Text variant="bodyLarge">No positions found for this order.</Text>
+          <Text variant="bodyLarge">Pro tuto zakázku nebyly nalezeny žádné pozice.</Text>
           <Text variant="bodySmall" style={{ color: '#999', marginTop: 8 }}>
-            Try a different order code
+            Zkuste jiný kód zakázky
           </Text>
         </View>
       ) : (
         <View style={styles.center}>
-          <Text variant="bodyLarge">Enter an order code to search</Text>
+          <Text variant="bodyLarge">Zadejte kód zakázky pro vyhledávání</Text>
           <Text variant="bodySmall" style={{ color: '#999', marginTop: 8 }}>
-            PBOM Hardware documents per position will be opened
+            Pro každou pozici budou otevřeny dokumenty
           </Text>
         </View>
       )}
