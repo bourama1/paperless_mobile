@@ -79,12 +79,13 @@ export default function SearchScreen() {
           returnKeyType="search"
         />
         <Button
-          mode="text"
+          mode="outlined"
           onPress={handleSearch}
           loading={isRefetching}
           disabled={!orderCode.trim() || isRefetching}
           style={styles.searchBtn}
           textColor="#ff5100"
+          buttonColor="#fff"
         >
           Hledat
         </Button>
