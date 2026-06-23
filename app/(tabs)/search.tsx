@@ -79,12 +79,12 @@ export default function SearchScreen() {
           returnKeyType="search"
         />
         <Button
-          mode="contained"
+          mode="text"
           onPress={handleSearch}
           loading={isRefetching}
           disabled={!orderCode.trim() || isRefetching}
           style={styles.searchBtn}
-          buttonColor="#ff5100"
+          textColor="#ff5100"
         >
           Hledat
         </Button>
@@ -155,10 +155,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 12,
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
   },
   input: { flex: 1 },
-  searchBtn: { height: 52, borderRadius: 4 },
+  searchBtn: { borderRadius: 20, paddingHorizontal: 16 },
   list: { padding: 12 },
   card: { marginBottom: 12 },
   cardTitle: { fontWeight: 'bold' },
