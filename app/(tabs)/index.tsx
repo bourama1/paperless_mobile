@@ -32,12 +32,12 @@ export default function WorkstationsScreen() {
   const importPbom = useMutation({
     mutationFn: async (order: NonNullable<Workstation['current_order_data']>) => {
       const response = await apiClient.post('/workstations/import-pbom', {
-        salesOrder: order.salesOrder,
-        position: order.position,
-        customer: order.customer,
-        productOrder: order.productOrder,
-        productDesc: order.productDesc,
-      });
+          projectNumber: order.projectNumber || order.salesOrder,
+          position: order.position,
+          customer: order.customer,
+          productOrder: order.productOrder,
+          productDesc: order.productDesc,
+        });
       return response.data;
     },
     onSuccess: (doc) => {
@@ -118,26 +118,34 @@ export default function WorkstationsScreen() {
                     <Text variant="titleMedium">
                       {item.current_order_data.productDesc}
                     </Text>
-                    <View style={styles.detailRow}>
-                      <Text variant="bodySmall" style={styles.label}>Order:</Text>
-                      <Text variant="bodySmall">{item.current_order_data.productOrder}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text variant="bodySmall" style={styles.label}>Sales Order:</Text>
-                      <Text variant="bodySmall">{item.current_order_data.salesOrder}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text variant="bodySmall" style={styles.label}>Position:</Text>
-                      <Text variant="bodySmall">{item.current_order_data.position}</Text>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Text variant="bodySmall" style={styles.label}>Customer:</Text>
-                      <Text variant="bodySmall">{item.current_order_data.customerDesc}</Text>
-                    </View>
+                    {item.current_order_data.productOrder ? (
+                      <View style={styles.detailRow}>
+                        <Text variant="bodySmall" style={styles.label}>Order:</Text>
+                        <Text variant="bodySmall" style={styles.value} numberOfLines={1}>{item.current_order_data.productOrder}</Text>
+                      </View>
+                    ) : null}
+                    {item.current_order_data.salesOrder ? (
+                      <View style={styles.detailRow}>
+                        <Text variant="bodySmall" style={styles.label}>Sales Order:</Text>
+                        <Text variant="bodySmall" style={styles.value} numberOfLines={1}>{item.current_order_data.salesOrder}</Text>
+                      </View>
+                    ) : null}
+                    {item.current_order_data.position ? (
+                      <View style={styles.detailRow}>
+                        <Text variant="bodySmall" style={styles.label}>Position:</Text>
+                        <Text variant="bodySmall" style={styles.value}>{item.current_order_data.position}</Text>
+                      </View>
+                    ) : null}
+                    {item.current_order_data.customerDesc ? (
+                      <View style={styles.detailRow}>
+                        <Text variant="bodySmall" style={styles.label}>Customer:</Text>
+                        <Text variant="bodySmall" style={styles.value} numberOfLines={1}>{item.current_order_data.customerDesc}</Text>
+                      </View>
+                    ) : null}
                     {item.current_order_data.quantity > 1 && (
                       <View style={styles.detailRow}>
                         <Text variant="bodySmall" style={styles.label}>Quantity:</Text>
-                        <Text variant="bodySmall">{item.current_order_data.quantity}</Text>
+                        <Text variant="bodySmall" style={styles.value}>{item.current_order_data.quantity}</Text>
                       </View>
                     )}
                   </Card.Content>
@@ -174,4 +182,5 @@ const styles = StyleSheet.create({
   cardTitle: { fontWeight: 'bold' },
   detailRow: { flexDirection: 'row', marginTop: 4 },
   label: { fontWeight: '600', width: 100, color: '#666' },
+  value: { flex: 1 },
 });
