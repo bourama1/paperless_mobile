@@ -6,6 +6,7 @@ import { WebView, WebViewMessageEvent } from "react-native-webview";
 import { Asset } from "expo-asset";
 import { readAsStringAsync } from "expo-file-system/legacy";
 import apiClient, { BASE_URL } from "../../src/api/client";
+import { t } from "../../src/i18n";
 
 export default function DocumentViewerScreen() {
     const { id, filename } = useLocalSearchParams();
@@ -74,7 +75,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                 setMode("edit");
             }
         } catch (err: any) {
-            const msg = err?.message || "Nepodařilo se otevřít editor";
+            const msg = err?.message || t("document.editorError");
             setSnackbar({ visible: true, message: msg });
         } finally {
             setLoading(false);
@@ -88,7 +89,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
             if (e.data?.type !== "SAVED") return;
             const pdfBase64 = e.data.pdfBase64;
             if (pdfBase64) {
-                setSnackbar({ visible: true, message: "Ukládání změn..." });
+                setSnackbar({ visible: true, message: t("document.saving") });
                 try {
                     await apiClient.post("/workstations/save-edited", {
                         documentId: Number(id),
@@ -99,7 +100,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                     /* ignore */
                 }
             }
-            setSnackbar({ visible: true, message: "Změny uloženy." });
+            setSnackbar({ visible: true, message: t("document.saved") });
             setTimeout(() => {
                 setRefreshKey((k) => k + 1);
                 setMode("view");
@@ -117,19 +118,19 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                 const msg = JSON.parse(event.nativeEvent.data);
                 if (msg.type === "SAVED") {
                     if (msg.pdfBase64) {
-                        setSnackbar({ visible: true, message: "Ukládání změn..." });
+                        setSnackbar({ visible: true, message: t("document.saving") });
                         await apiClient.post("/workstations/save-edited", {
                             documentId: Number(id),
                             pdfBase64: msg.pdfBase64,
                             filename: msg.fileName || filename,
                         });
                     }
-                    setSnackbar({ visible: true, message: "Změny uloženy." });
+                    setSnackbar({ visible: true, message: t("document.saved") });
                     setTimeout(() => {
-                            setRefreshKey((k) => k + 1);
-                            setMode("view");
-                            setEditHtml(null);
-                        }, 500);
+                        setRefreshKey((k) => k + 1);
+                        setMode("view");
+                        setEditHtml(null);
+                    }, 500);
                 }
             } catch {
                 // ignore
@@ -138,12 +139,9 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
         [id, filename],
     );
 
-    const handleWebViewError = useCallback(
-        (event: any) => {
-            console.log("WebView error:", event.nativeEvent);
-        },
-        [],
-    );
+    const handleWebViewError = useCallback((event: any) => {
+        console.log("WebView error:", event.nativeEvent);
+    }, []);
 
     // ── web render ──
     if (Platform.OS === "web") {
@@ -151,7 +149,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
             <View style={styles.container}>
                 <Appbar.Header>
                     <Appbar.BackAction onPress={() => router.back()} />
-                    <Appbar.Content title={mode === "edit" ? "Úpravy..." : `${filename}`} />
+                    <Appbar.Content title={mode === "edit" ? t("document.editing") : `${filename}`} />
                     {mode === "view" && <Appbar.Action icon="pencil" onPress={handleEdit} disabled={loading} />}
                 </Appbar.Header>
                 <View style={styles.viewerContainer}>
@@ -165,7 +163,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                         <iframe
                             src={editSrc}
                             style={{ width: "100%", height: "100%", border: "none" }}
-                            title="PDF Editor"
+                            title={t("document.iframeTitle")}
                         />
                     :   null}
                 </View>
@@ -186,14 +184,21 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
         <View style={styles.container}>
             <Appbar.Header>
                 <Appbar.BackAction onPress={() => router.back()} />
-                <Appbar.Content title={mode === "edit" ? "Úpravy..." : `${filename}`} />
+                <Appbar.Content title={mode === "edit" ? t("document.editing") : `${filename}`} />
                 {mode === "view" && <Appbar.Action icon="pencil" onPress={handleEdit} disabled={loading} />}
             </Appbar.Header>
 
             <View style={styles.viewerContainer}>
                 {mode === "view" ?
                     <WebView
-                        source={{ html: getPdfViewerHtml(pdfUrl, filename as string) }}
+                        source={{
+                            html: getPdfViewerHtml(
+                                pdfUrl,
+                                filename as string,
+                                t("document.viewerLoading"),
+                                t("document.viewerError"),
+                            ),
+                        }}
                         style={{ flex: 1 }}
                         originWhitelist={["*"]}
                         javaScriptEnabled={true}
@@ -225,7 +230,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
     );
 }
 
-function getPdfViewerHtml(url: string, docName: string) {
+function getPdfViewerHtml(url: string, docName: string, loadingText: string, errorPrefix: string) {
     return `
 <!DOCTYPE html>
 <html>
@@ -247,7 +252,7 @@ function getPdfViewerHtml(url: string, docName: string) {
   </style>
 </head>
 <body>
-  <div id="viewer"><div class="loading-wrap"><div class="spinner"></div><div class="loading-name">Načítání PDF...<br>${docName}</div></div></div>
+  <div id="viewer"><div class="loading-wrap"><div class="spinner"></div><div class="loading-name">${loadingText}<br>${docName}</div></div></div>
   <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     pdfjsLib.getDocument('${url}').promise.then(function(pdf) {
@@ -273,7 +278,7 @@ function getPdfViewerHtml(url: string, docName: string) {
         })(i);
       }
     }).catch(function(err) {
-      document.getElementById('viewer').innerHTML = '<div class="error">Chyba při načítání PDF: ' + err.message + '</div>';
+      document.getElementById('viewer').innerHTML = '<div class="error">' + errorPrefix + ' ' + err.message + '</div>';
     });
   </script>
 </body>
