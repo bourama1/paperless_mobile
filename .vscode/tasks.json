@@ -1,0 +1,21 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Run Mobile (Expo)",
+            "type": "shell",
+            "command": "npx expo start",
+            "group": { "kind": "build", "isDefault": true },
+            "problemMatcher": [],
+            "detail": "Start Expo dev server for mobile app"
+        },
+        {
+            "label": "Build Mobile APK",
+            "type": "shell",
+            "command": "cd android && ./gradlew clean assembleRelease",
+            "group": "build",
+            "problemMatcher": [],
+            "detail": "Build standalone debug APK via Gradle"
+        }
+    ]
+}
