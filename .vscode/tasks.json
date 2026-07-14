@@ -15,7 +15,7 @@
             "command": "cd android && ./gradlew clean assembleRelease",
             "group": "build",
             "problemMatcher": [],
-            "detail": "Build standalone debug APK via Gradle"
+            "detail": "Build production release APK via Gradle (assembleRelease)"
         }
     ]
 }
