@@ -242,7 +242,7 @@ function getPdfViewerHtml(url: string, docName: string, loadingText: string, err
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #525659; font-family: sans-serif; overflow-x: auto; }
     #viewer { width: 100%; }
-    .page { display: flex; justify-content: center; margin-bottom: 8px; }
+    .page { display: flex; justify-content: flex-start; margin-bottom: 8px; padding-left: 8px; }
     .page canvas { box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
     .error { color: #fff; text-align: center; padding: 40px 20px; font-size: 16px; }
     .loading-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; gap:16px; }
