@@ -1,6 +1,6 @@
-import React, { useCallback, useLayoutEffect } from "react";
+import React, { useState, useCallback, useLayoutEffect, useMemo } from "react";
 import { FlatList, View, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
-import { Card, Text, Chip, Divider } from "react-native-paper";
+import { Card, Text, Chip, Divider, Snackbar } from "react-native-paper";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useFocusEffect, useRouter, useNavigation } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -11,6 +11,7 @@ import { t } from "../../src/i18n";
 export default function WorkstationsScreen() {
     const router = useRouter();
     const navigation = useNavigation();
+    const [snackbar, setSnackbar] = useState({ visible: false, message: "" });
 
     const {
         data: workstations,
@@ -54,9 +55,12 @@ export default function WorkstationsScreen() {
                 },
             });
         },
+        onError: () => {
+            setSnackbar({ visible: true, message: t("workstations.error") });
+        },
     });
 
-    const sorted = workstations?.slice().sort((a, b) => a.name.localeCompare(b.name));
+    const sorted = useMemo(() => workstations?.slice().sort((a, b) => a.name.localeCompare(b.name)), [workstations]);
 
     useLayoutEffect(() => {
         navigation.setOptions({
@@ -68,7 +72,7 @@ export default function WorkstationsScreen() {
                 </TouchableOpacity>
             ),
         });
-    }, [navigation, refetch]);
+    }, [navigation, refetch, isRefetching]);
 
     if (isLoading && !isRefetching) {
         return (
@@ -136,6 +140,18 @@ export default function WorkstationsScreen() {
                                     <Card.Content>
                                         <Divider style={{ marginBottom: 12 }} />
                                         <Text variant="titleMedium">{item.current_order_data.productDesc}</Text>
+                                        {item.current_order_data.type ?
+                                            <View style={styles.detailRow}>
+                                                <Text variant="bodySmall" style={styles.label}>
+                                                    {t("workstations.label.type")}
+                                                </Text>
+                                                <Text variant="bodySmall" style={styles.value} numberOfLines={1}>
+                                                    {t(`workstations.type.${item.current_order_data.type}`, {
+                                                        defaultValue: item.current_order_data.type,
+                                                    })}
+                                                </Text>
+                                            </View>
+                                        :   null}
                                         {item.current_order_data.salesOrder ?
                                             <View style={styles.detailRow}>
                                                 <Text variant="bodySmall" style={styles.label}>
@@ -210,6 +226,9 @@ export default function WorkstationsScreen() {
                     </TouchableOpacity>
                 </View>
             }
+            <Snackbar visible={snackbar.visible} onDismiss={() => setSnackbar({ ...snackbar, visible: false })}>
+                {snackbar.message}
+            </Snackbar>
         </View>
     );
 }

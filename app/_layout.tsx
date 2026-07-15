@@ -20,7 +20,6 @@ const theme = {
 };
 
 export default function RootLayout() {
-    console.log("RootLayout rendering");
     return (
         <QueryClientProvider client={queryClient}>
             <SafeAreaProvider style={{ flex: 1, backgroundColor: "#fff" }}>

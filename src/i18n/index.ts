@@ -2,11 +2,12 @@ import cs from "./cs.json";
 
 const dict: Record<string, string> = cs;
 
-export function t(key: string, params?: Record<string, string | number>): string {
-    let val = dict[key] ?? key;
+export function t(key: string, params?: Record<string, string | number> & { defaultValue?: string }): string {
+    let val = dict[key] ?? params?.defaultValue ?? key;
     if (params) {
         for (const [k, v] of Object.entries(params)) {
-            val = val.replace(`{${k}}`, String(v));
+            if (k === "defaultValue") continue;
+            val = val.replaceAll(`{${k}}`, String(v));
         }
     }
     return val;

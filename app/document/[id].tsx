@@ -20,13 +20,22 @@ export default function DocumentViewerScreen() {
     const [editHtml, setEditHtml] = useState<string | null>(null);
     const blobUrlRef = useRef<string | null>(null);
 
-    // Clean up blob URL when leaving edit mode
+    // Clean up blob URL when leaving edit mode or unmounting
     useEffect(() => {
         if (mode !== "edit" && blobUrlRef.current) {
             URL.revokeObjectURL(blobUrlRef.current);
             blobUrlRef.current = null;
         }
     }, [mode]);
+
+    useEffect(() => {
+        return () => {
+            if (blobUrlRef.current) {
+                URL.revokeObjectURL(blobUrlRef.current);
+                blobUrlRef.current = null;
+            }
+        };
+    }, []);
 
     const pdfUrl = `${BASE_URL}/workstations/documents/${id}/render?t=${refreshKey}`;
 
@@ -96,11 +105,12 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                         pdfBase64,
                         filename: e.data.fileName || filename,
                     });
-                } catch {
-                    /* ignore */
+                    setSnackbar({ visible: true, message: t("document.saved") });
+                } catch (err: any) {
+                    setSnackbar({ visible: true, message: err?.response?.data?.error || err?.message || t("document.editorError") });
+                    return;
                 }
             }
-            setSnackbar({ visible: true, message: t("document.saved") });
             setTimeout(() => {
                 setRefreshKey((k) => k + 1);
                 setMode("view");
@@ -119,21 +129,26 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                 if (msg.type === "SAVED") {
                     if (msg.pdfBase64) {
                         setSnackbar({ visible: true, message: t("document.saving") });
-                        await apiClient.post("/workstations/save-edited", {
-                            documentId: Number(id),
-                            pdfBase64: msg.pdfBase64,
-                            filename: msg.fileName || filename,
-                        });
+                        try {
+                            await apiClient.post("/workstations/save-edited", {
+                                documentId: Number(id),
+                                pdfBase64: msg.pdfBase64,
+                                filename: msg.fileName || filename,
+                            });
+                            setSnackbar({ visible: true, message: t("document.saved") });
+                        } catch (err: any) {
+                            setSnackbar({ visible: true, message: err?.response?.data?.error || err?.message || t("document.editorError") });
+                            return;
+                        }
                     }
-                    setSnackbar({ visible: true, message: t("document.saved") });
                     setTimeout(() => {
                         setRefreshKey((k) => k + 1);
                         setMode("view");
                         setEditHtml(null);
                     }, 500);
                 }
-            } catch {
-                // ignore
+            } catch (err: any) {
+                setSnackbar({ visible: true, message: err?.message || t("document.editorError") });
             }
         },
         [id, filename],
@@ -231,6 +246,10 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
 }
 
 function getPdfViewerHtml(url: string, docName: string, loadingText: string, errorPrefix: string) {
+    const safeUrl = JSON.stringify(url);
+    const safeDocName = docName.replace(/[<>]/g, "");
+    const safeLoadingText = loadingText.replace(/[<>]/g, "");
+    const safeErrorPrefix = errorPrefix.replace(/[<>]/g, "");
     return `
 <!DOCTYPE html>
 <html>
@@ -252,10 +271,10 @@ function getPdfViewerHtml(url: string, docName: string, loadingText: string, err
   </style>
 </head>
 <body>
-  <div id="viewer"><div class="loading-wrap"><div class="spinner"></div><div class="loading-name">${loadingText}<br>${docName}</div></div></div>
+  <div id="viewer"><div class="loading-wrap"><div class="spinner"></div><div class="loading-name">${safeLoadingText}<br>${safeDocName}</div></div></div>
   <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    pdfjsLib.getDocument('${url}').promise.then(function(pdf) {
+    pdfjsLib.getDocument(${safeUrl}).promise.then(function(pdf) {
       document.getElementById('viewer').innerHTML = '';
       for (var i = 1; i <= pdf.numPages; i++) {
         (function(pageNum) {
@@ -278,7 +297,7 @@ function getPdfViewerHtml(url: string, docName: string, loadingText: string, err
         })(i);
       }
     }).catch(function(err) {
-      document.getElementById('viewer').innerHTML = '<div class="error">' + errorPrefix + ' ' + err.message + '</div>';
+      document.getElementById('viewer').innerHTML = '<div class="error">' + safeErrorPrefix + ' ' + err.message + '</div>';
     });
   </script>
 </body>

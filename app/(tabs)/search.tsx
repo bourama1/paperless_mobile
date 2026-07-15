@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { FlatList, View, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
+import { FlatList, View, StyleSheet, TouchableOpacity, ActivityIndicator, Keyboard } from "react-native";
 import { Card, Text, TextInput, Divider, Snackbar } from "react-native-paper";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -63,6 +63,7 @@ export default function SearchScreen() {
 
     const handleSearch = () => {
         if (!orderCode.trim()) return;
+        Keyboard.dismiss();
         refetch();
     };
 
@@ -114,7 +115,7 @@ export default function SearchScreen() {
             : results && results.length > 0 ?
                 <FlatList
                     data={results}
-                    keyExtractor={(item, i) => `${item.order_code}-${item.position_code}-${i}`}
+                    keyExtractor={(item) => `${item.order_code}-${item.position_code}`}
                     contentContainerStyle={styles.list}
                     renderItem={({ item }) => (
                         <TouchableOpacity
@@ -210,6 +211,5 @@ const styles = StyleSheet.create({
     list: { padding: 12 },
     card: { marginBottom: 12 },
     cardTitle: { fontWeight: "bold" },
-    detailRow: { flexDirection: "row", marginTop: 4 },
-    label: { fontWeight: "600", width: 100, color: "#666" },
+
 });
