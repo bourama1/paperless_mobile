@@ -30,6 +30,13 @@ export default function TabLayout() {
                     tabBarIcon: ({ color, size }) => <Ionicons name="search" size={size} color={color} />,
                 }}
             />
+            <Tabs.Screen
+                name="revisions"
+                options={{
+                    title: t("revisions.title"),
+                    tabBarIcon: ({ color, size }) => <Ionicons name="document-text" size={size} color={color} />,
+                }}
+            />
         </Tabs>
     );
 }

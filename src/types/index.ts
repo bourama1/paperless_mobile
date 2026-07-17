@@ -49,3 +49,23 @@ export interface Workstation {
   is_active: number;
   last_polled_at: string | null;
 }
+
+export interface RevisionOverview {
+  id: number;
+  filename: string;
+  version: number;
+  created_at: string;
+  has_annotations: boolean;
+}
+
+export interface RevisionOverviewItem {
+  document_id: number;
+  document_name: string;
+  updated_at: string;
+  revisions: RevisionOverview[];
+}
+
+export interface RevisionsResponse {
+  date: string;
+  items: RevisionOverviewItem[];
+}

@@ -34,5 +34,12 @@
     "document.editing": "Úpravy...",
     "document.iframeTitle": "PDF Editor",
     "document.viewerLoading": "Načítání PDF...",
-    "document.viewerError": "Chyba při načítání PDF: {msg}"
+    "document.viewerError": "Chyba při načítání PDF: {msg}",
+    "revisions.title": "Revize",
+    "revisions.empty": "Pro tento den nebyly nalezeny žádné revize.",
+    "revisions.revisions": "revizí",
+    "revisions.annotated": "S anotacemi",
+    "revisions.today": "Dnes",
+    "revisions.loading": "Načítání revizí...",
+    "revisions.error": "Chyba při načítání revizí"
 }
