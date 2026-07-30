@@ -41,6 +41,7 @@ export default function WorkstationsScreen() {
                 customer: order.customer,
                 productOrder: order.productOrder,
                 productDesc: order.productDesc,
+                workplace: order.workplace,
             });
             return response.data;
         },

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { FlatList, View, StyleSheet, TouchableOpacity, ActivityIndicator, Keyboard } from "react-native";
-import { Card, Text, TextInput, Divider, Snackbar } from "react-native-paper";
+import { Card, Text, TextInput, Divider, Snackbar, Portal, Modal, List } from "react-native-paper";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
@@ -13,10 +13,21 @@ interface SearchResult {
     position_code: number;
 }
 
+interface PbomTypeOption {
+    document_type: number;
+    name: string; // machine name, e.g. "pbom_motor" — translate via docType.<name>
+}
+
 export default function SearchScreen() {
     const router = useRouter();
     const [orderCode, setOrderCode] = useState("");
     const [snackbar, setSnackbar] = useState({ visible: false, message: "" });
+
+    // BOM-type picker modal state — shown when a searched position has more
+    // than one BOM type available, so the person can pick which one to open.
+    const [pickerVisible, setPickerVisible] = useState(false);
+    const [pickerOptions, setPickerOptions] = useState<PbomTypeOption[]>([]);
+    const [pickerTarget, setPickerTarget] = useState<SearchResult | null>(null);
 
     const {
         data: results,
@@ -36,15 +47,17 @@ export default function SearchScreen() {
     });
 
     const importPbom = useMutation({
-        mutationFn: async (item: SearchResult) => {
+        mutationFn: async ({ item, documentType }: { item: SearchResult; documentType?: number }) => {
             const response = await apiClient.post("/workstations/import-pbom", {
                 projectNumber: String(item.order_code),
                 position: String(item.position_code),
                 customer: String(item.customer_code),
+                documentType,
             });
             return response.data;
         },
         onSuccess: (doc) => {
+            setPickerVisible(false);
             const rev = doc.revisions?.[0];
             router.push({
                 pathname: `/document/${doc.id}`,
@@ -56,8 +69,39 @@ export default function SearchScreen() {
             });
         },
         onError: (error: any) => {
+            setPickerVisible(false);
             const msg = error?.response?.data?.error || error.message;
             setSnackbar({ visible: true, message: t("search.errorPrefix", { msg }) });
+        },
+    });
+
+    // Find out which BOM types actually exist for the tapped position, then
+    // either open the only one directly, or let the person choose.
+    const fetchTypes = useMutation({
+        mutationFn: async (item: SearchResult) => {
+            const response = await apiClient.get("/workstations/pbom-types", {
+                params: {
+                    order_code: item.order_code,
+                    position_code: item.position_code,
+                },
+            });
+            return { item, types: response.data as PbomTypeOption[] };
+        },
+        onSuccess: ({ item, types }) => {
+            if (types.length === 0) {
+                setSnackbar({ visible: true, message: t("search.typesEmpty") });
+                return;
+            }
+            if (types.length === 1) {
+                importPbom.mutate({ item, documentType: types[0].document_type });
+                return;
+            }
+            setPickerOptions(types);
+            setPickerTarget(item);
+            setPickerVisible(true);
+        },
+        onError: () => {
+            setSnackbar({ visible: true, message: t("search.typesError") });
         },
     });
 
@@ -119,22 +163,25 @@ export default function SearchScreen() {
                     contentContainerStyle={styles.list}
                     renderItem={({ item }) => (
                         <TouchableOpacity
-                            onPress={() => importPbom.mutate(item)}
-                            disabled={importPbom.isPending}
+                            onPress={() => fetchTypes.mutate(item)}
+                            disabled={fetchTypes.isPending || importPbom.isPending}
                             activeOpacity={0.7}>
                             <Card style={[styles.card, { borderColor: "#ff5100" }]} mode="outlined">
                                 <Card.Title
                                     title={t("search.resultOrder", { code: item.order_code })}
                                     titleStyle={styles.cardTitle}
                                     subtitle={t("search.resultPosition", { code: item.position_code })}
-                                    right={(props) => (
-                                        <Ionicons
-                                            name="chevron-forward"
-                                            size={20}
-                                            color="#ccc"
-                                            style={{ marginRight: 12 }}
-                                        />
-                                    )}
+                                    right={(props) =>
+                                        fetchTypes.isPending && fetchTypes.variables === item ?
+                                            <ActivityIndicator size="small" style={{ marginRight: 12 }} />
+                                        :   <Ionicons
+                                                name="chevron-forward"
+                                                size={20}
+                                                color="#ccc"
+                                                style={{ marginRight: 12 }}
+                                            />
+
+                                    }
                                 />
                             </Card>
                         </TouchableOpacity>
@@ -154,6 +201,43 @@ export default function SearchScreen() {
                     </Text>
                 </View>
             }
+
+            <Portal>
+                <Modal
+                    visible={pickerVisible}
+                    onDismiss={() => setPickerVisible(false)}
+                    contentContainerStyle={styles.modal}>
+                    <Text variant="titleMedium" style={{ marginBottom: 4 }}>
+                        {t("search.selectType")}
+                    </Text>
+                    <Text variant="bodySmall" style={{ color: "#999", marginBottom: 12 }}>
+                        {t("search.selectTypeHint")}
+                    </Text>
+                    <FlatList
+                        data={pickerOptions}
+                        keyExtractor={(opt) => String(opt.document_type)}
+                        renderItem={({ item: opt }) => (
+                            <List.Item
+                                title={t(`docType.${opt.name}`, { defaultValue: opt.name })}
+                                onPress={() => {
+                                    if (pickerTarget) {
+                                        importPbom.mutate({ item: pickerTarget, documentType: opt.document_type });
+                                    }
+                                }}
+                                right={(props) => <Ionicons name="chevron-forward" size={20} color="#ccc" />}
+                                disabled={importPbom.isPending}
+                            />
+                        )}
+                        ItemSeparatorComponent={Divider}
+                    />
+                    <TouchableOpacity
+                        style={[styles.pillBtn, styles.pillBtnCancel]}
+                        activeOpacity={0.8}
+                        onPress={() => setPickerVisible(false)}>
+                        <Text style={styles.pillBtnCancelText}>{t("search.cancel")}</Text>
+                    </TouchableOpacity>
+                </Modal>
+            </Portal>
 
             <Snackbar visible={snackbar.visible} onDismiss={() => setSnackbar({ ...snackbar, visible: false })}>
                 {snackbar.message}
@@ -211,5 +295,22 @@ const styles = StyleSheet.create({
     list: { padding: 12 },
     card: { marginBottom: 12 },
     cardTitle: { fontWeight: "bold" },
-
+    modal: {
+        backgroundColor: "#fff",
+        marginHorizontal: 20,
+        borderRadius: 12,
+        padding: 20,
+        maxHeight: "70%",
+    },
+    pillBtnCancel: {
+        marginTop: 16,
+        backgroundColor: "transparent",
+        borderWidth: 1,
+        borderColor: "#ddd",
+    },
+    pillBtnCancelText: {
+        color: "#666",
+        fontSize: 14,
+        fontWeight: "600",
+    },
 });
