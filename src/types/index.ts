@@ -48,6 +48,8 @@ export interface Workstation {
   current_order_data: WorkstationOrder | null;
   is_active: number;
   last_polled_at: string | null;
+  cycle_index: number | null;
+  total_cycles: number | null;
 }
 
 export interface RevisionOverview {

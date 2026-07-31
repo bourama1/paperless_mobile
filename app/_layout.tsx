@@ -31,6 +31,7 @@ export default function RootLayout() {
                             headerTitleStyle: { fontWeight: "bold" },
                         }}>
                         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                        <Stack.Screen name="kiosk" options={{ headerShown: false }} />
                         <Stack.Screen
                             name="document/[id]"
                             options={{ title: t("document.title"), headerShown: false }}

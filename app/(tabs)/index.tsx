@@ -66,14 +66,19 @@ export default function WorkstationsScreen() {
     useLayoutEffect(() => {
         navigation.setOptions({
             headerRight: () => (
-                <TouchableOpacity onPress={() => refetch()} disabled={isRefetching} style={{ marginRight: 16 }}>
-                    {isRefetching ?
-                        <ActivityIndicator size="small" color="#ff5100" />
-                    :   <Ionicons name="refresh" size={22} color="#ff5100" />}
-                </TouchableOpacity>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <TouchableOpacity onPress={() => router.push("/kiosk")} style={{ marginRight: 16 }}>
+                        <Ionicons name="tablet-landscape-outline" size={22} color="#ff5100" />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => refetch()} disabled={isRefetching} style={{ marginRight: 16 }}>
+                        {isRefetching ?
+                            <ActivityIndicator size="small" color="#ff5100" />
+                        :   <Ionicons name="refresh" size={22} color="#ff5100" />}
+                    </TouchableOpacity>
+                </View>
             ),
         });
-    }, [navigation, refetch, isRefetching]);
+    }, [navigation, refetch, isRefetching, router]);
 
     if (isLoading && !isRefetching) {
         return (
@@ -193,16 +198,29 @@ export default function WorkstationsScreen() {
                                                 </Text>
                                             </View>
                                         :   null}
-                                        {item.current_order_data.quantity > 1 && (
+                                        {item.total_cycles && item.total_cycles > 1 ?
                                             <View style={styles.detailRow}>
                                                 <Text variant="bodySmall" style={styles.label}>
-                                                    {t("workstations.label.quantity")}
+                                                    {t("workstations.label.cycle")}
                                                 </Text>
                                                 <Text variant="bodySmall" style={styles.value}>
-                                                    {item.current_order_data.quantity}
+                                                    {t("workstations.cycleValue", {
+                                                        current: item.cycle_index ?? 1,
+                                                        total: item.total_cycles,
+                                                    })}
                                                 </Text>
                                             </View>
-                                        )}
+                                        : item.current_order_data.quantity > 1 && (
+                                              <View style={styles.detailRow}>
+                                                  <Text variant="bodySmall" style={styles.label}>
+                                                      {t("workstations.label.quantity")}
+                                                  </Text>
+                                                  <Text variant="bodySmall" style={styles.value}>
+                                                      {item.current_order_data.quantity}
+                                                  </Text>
+                                              </View>
+                                          )
+                                        }
                                     </Card.Content>
                                 :   <Card.Content>
                                         <Text variant="bodyMedium" style={{ color: "#999" }}>
