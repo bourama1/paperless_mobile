@@ -35,9 +35,27 @@ const STATUS_OPTIONS: { value: CompletionStatus; label: string; icon: keyof type
 
 export default function KioskScreen() {
     const router = useRouter();
-    const [workstation, setWorkstation] = useState<string | null>(null);
     const [mode, setMode] = useState<KioskMode | null>(null);
+    const [selection, setSelection] = useState<string | null>(null);
 
+    // Completion mode filters FINISHED events, which only ever carry
+    // order.workplace (a work-TYPE string like "Hardware") — never a
+    // physical station name. So Completion mode picks from that list...
+    const {
+        data: workplaces,
+        isLoading: workplacesLoading,
+        refetch: refetchWorkplaces,
+    } = useQuery<string[]>({
+        queryKey: ["workplaces"],
+        queryFn: async () => {
+            const response = await apiClient.get("/workstations/workplaces");
+            return response.data;
+        },
+        enabled: mode === "completion" && selection === null,
+    });
+
+    // ...while Status mode shows a physical station's current order, so it
+    // picks from the polling feed's actual station names (e.g. "WS_5").
     const {
         data: workstations,
         isLoading: workstationsLoading,
@@ -48,11 +66,11 @@ export default function KioskScreen() {
             const response = await apiClient.get("/workstations");
             return response.data;
         },
-        enabled: workstation === null, // only need the list while picking
+        enabled: mode === "status" && selection === null,
     });
 
     // Keep the tablet's screen awake for as long as this screen is mounted,
-    // regardless of which mode/workstation is active.
+    // regardless of which mode/selection is active.
     useEffect(() => {
         activateKeepAwakeAsync();
         return () => {
@@ -61,12 +79,12 @@ export default function KioskScreen() {
     }, []);
 
     const reset = useCallback(() => {
-        setWorkstation(null);
         setMode(null);
+        setSelection(null);
     }, []);
 
-    // ── 1. workstation picker ────────────────────────────────────────────────
-    if (!workstation) {
+    // ── 1. mode picker ───────────────────────────────────────────────────────
+    if (!mode) {
         return (
             <View style={styles.container}>
                 <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -74,43 +92,6 @@ export default function KioskScreen() {
                     <Text style={styles.backBtnText}>{t("kiosk.back")}</Text>
                 </TouchableOpacity>
                 <Text variant="headlineSmall" style={styles.pickerTitle}>
-                    {t("kiosk.pickWorkstation")}
-                </Text>
-                {workstationsLoading ?
-                    <ActivityIndicator size="large" style={{ marginTop: 40 }} />
-                :   <FlatList
-                        data={workstations ?? []}
-                        keyExtractor={(item) => String(item.id)}
-                        contentContainerStyle={styles.list}
-                        refreshing={workstationsLoading}
-                        onRefresh={refetchWorkstations}
-                        renderItem={({ item }) => (
-                            <TouchableOpacity
-                                style={styles.workstationCard}
-                                activeOpacity={0.7}
-                                onPress={() => setWorkstation(item.name)}>
-                                <Text style={styles.workstationCardText}>{item.name}</Text>
-                                <Ionicons name="chevron-forward" size={22} color="#ccc" />
-                            </TouchableOpacity>
-                        )}
-                    />
-                }
-            </View>
-        );
-    }
-
-    // ── 2. mode picker ────────────────────────────────────────────────────────
-    if (!mode) {
-        return (
-            <View style={styles.container}>
-                <TouchableOpacity onPress={() => setWorkstation(null)} style={styles.backBtn}>
-                    <Ionicons name="arrow-back" size={22} color="#ff5100" />
-                    <Text style={styles.backBtnText}>{t("kiosk.changeWorkstation")}</Text>
-                </TouchableOpacity>
-                <Text variant="headlineSmall" style={styles.pickerTitle}>
-                    {workstation}
-                </Text>
-                <Text variant="bodyMedium" style={[styles.pickerTitle, { color: "#909090", marginTop: 4 }]}>
                     {t("kiosk.pickMode")}
                 </Text>
                 <View style={styles.modeList}>
@@ -132,16 +113,65 @@ export default function KioskScreen() {
         );
     }
 
+    // ── 2. selection picker (workplace type, or physical station) ───────────
+    if (!selection) {
+        const isCompletion = mode === "completion";
+        const loading = isCompletion ? workplacesLoading : workstationsLoading;
+        const refetch = isCompletion ? refetchWorkplaces : refetchWorkstations;
+        const items: { key: string; label: string }[] =
+            isCompletion ?
+                (workplaces ?? []).map((w) => ({ key: w, label: w }))
+            :   (workstations ?? []).map((w) => ({ key: String(w.id), label: w.name }));
+
+        return (
+            <View style={styles.container}>
+                <TouchableOpacity onPress={() => setMode(null)} style={styles.backBtn}>
+                    <Ionicons name="arrow-back" size={22} color="#ff5100" />
+                    <Text style={styles.backBtnText}>{t("kiosk.changeMode")}</Text>
+                </TouchableOpacity>
+                <Text variant="headlineSmall" style={styles.pickerTitle}>
+                    {isCompletion ? t("kiosk.pickWorkplace") : t("kiosk.pickWorkstation")}
+                </Text>
+                {loading ?
+                    <ActivityIndicator size="large" style={{ marginTop: 40 }} />
+                : items.length === 0 ?
+                    <View style={styles.center}>
+                        <Text variant="bodyMedium" style={{ color: "#909090" }}>
+                            {isCompletion ? t("kiosk.noWorkplaces") : t("kiosk.noWorkstations")}
+                        </Text>
+                    </View>
+                :   <FlatList
+                        data={items}
+                        keyExtractor={(item) => item.key}
+                        contentContainerStyle={styles.list}
+                        refreshing={loading}
+                        onRefresh={refetch}
+                        renderItem={({ item }) => (
+                            <TouchableOpacity
+                                style={styles.workstationCard}
+                                activeOpacity={0.7}
+                                onPress={() => setSelection(item.label)}>
+                                <Text style={styles.workstationCardText}>{item.label}</Text>
+                                <Ionicons name="chevron-forward" size={22} color="#ccc" />
+                            </TouchableOpacity>
+                        )}
+                    />
+                }
+            </View>
+        );
+    }
+
     // ── 3. the actual kiosk ──────────────────────────────────────────────────
     return mode === "completion" ?
-            <CompletionKiosk workstation={workstation} onChangeWorkstation={reset} />
-        :   <StatusKiosk workstation={workstation} onChangeWorkstation={reset} />;
+            <CompletionKiosk workstation={selection} onChangeWorkstation={reset} />
+        :   <StatusKiosk workstation={selection} onChangeWorkstation={reset} />;
 }
 
 // ============================================================================
-// Completion kiosk — reacts to FINISHED cycles at this workstation, asks who
-// finished it and whether it's complete / missing a product / shipping
-// incomplete. Intended for the LAST workstation in a production line.
+// Completion kiosk — reacts to FINISHED cycles for a given work-TYPE
+// (e.g. "Hardware"), asks who finished it and whether it's complete /
+// missing a product / shipping incomplete. Intended for the LAST
+// workstation in a production line.
 // ============================================================================
 
 function CompletionKiosk({
@@ -478,21 +508,15 @@ function StatusKiosk({ workstation, onChangeWorkstation }: { workstation: string
                             <Text style={styles.label}>{t("workstations.label.position")}</Text>
                             <Text style={styles.value}>{current.current_order_data.position}</Text>
                         </View>
-                        {current.total_cycles && current.total_cycles > 1 ?
-                            <View style={styles.statusCardRow}>
-                                <Text style={styles.label}>{t("workstations.label.cycle")}</Text>
-                                <Text style={styles.value}>
-                                    {t("workstations.cycleValue", {
-                                        current: current.cycle_index ?? 1,
-                                        total: current.total_cycles,
-                                    })}
-                                </Text>
-                            </View>
-                        :   <View style={styles.statusCardRow}>
-                                <Text style={styles.label}>{t("workstations.label.quantity")}</Text>
-                                <Text style={styles.value}>{current.current_order_data.quantity}</Text>
-                            </View>
-                        }
+                        <View style={styles.statusCardRow}>
+                            <Text style={styles.label}>{t("workstations.label.cycle")}</Text>
+                            <Text style={styles.value}>
+                                {t("workstations.cycleValue", {
+                                    current: current.cycle_index ?? 1,
+                                    total: current.total_cycles ?? 1,
+                                })}
+                            </Text>
+                        </View>
                         <Text style={styles.tapHint}>{t("kiosk.tapToOpen")}</Text>
                     </TouchableOpacity>
                 :   <View style={styles.idleBody}>
@@ -513,6 +537,7 @@ function StatusKiosk({ workstation, onChangeWorkstation }: { workstation: string
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: "#fff" },
+    center: { flex: 1, justifyContent: "center", alignItems: "center" },
     backBtn: { flexDirection: "row", alignItems: "center", padding: 16 },
     backBtnText: { color: "#ff5100", fontWeight: "600", marginLeft: 6 },
     pickerTitle: { paddingHorizontal: 16, fontWeight: "bold" },

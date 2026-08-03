@@ -1,12 +1,38 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { View, StyleSheet, ActivityIndicator, Platform } from "react-native";
+import { View, StyleSheet, ActivityIndicator, Platform, TouchableOpacity } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Appbar, Snackbar } from "react-native-paper";
+import { Appbar, Snackbar, Portal, Modal, Menu, Text } from "react-native-paper";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
 import { Asset } from "expo-asset";
-import { readAsStringAsync } from "expo-file-system/legacy";
+import { readAsStringAsync, writeAsStringAsync, cacheDirectory, EncodingType } from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 import apiClient, { BASE_URL } from "../../src/api/client";
 import { t } from "../../src/i18n";
+
+interface Employee {
+    id: number;
+    name: string;
+}
+
+// Self-contained base64 encoder — avoids depending on btoa being polyfilled
+// in the RN/Hermes runtime, which isn't guaranteed.
+const BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    let result = "";
+    for (let i = 0; i < bytes.length; i += 3) {
+        const b1 = bytes[i]!;
+        const b2 = i + 1 < bytes.length ? bytes[i + 1]! : undefined;
+        const b3 = i + 2 < bytes.length ? bytes[i + 2]! : undefined;
+        const triplet = (b1 << 16) | ((b2 ?? 0) << 8) | (b3 ?? 0);
+        result += BASE64_CHARS[(triplet >> 18) & 0x3f];
+        result += BASE64_CHARS[(triplet >> 12) & 0x3f];
+        result += b2 !== undefined ? BASE64_CHARS[(triplet >> 6) & 0x3f] : "=";
+        result += b3 !== undefined ? BASE64_CHARS[triplet & 0x3f] : "=";
+    }
+    return result;
+}
 
 export default function DocumentViewerScreen() {
     const { id, filename } = useLocalSearchParams();
@@ -19,6 +45,81 @@ export default function DocumentViewerScreen() {
     const [editSrc, setEditSrc] = useState<string | null>(null);
     const [editHtml, setEditHtml] = useState<string | null>(null);
     const blobUrlRef = useRef<string | null>(null);
+
+    // ── prep-station "print label" action ──
+    // Needs this document's projectNumber/position, which the route params
+    // don't carry — fetched from its own record.
+    const { data: docMeta } = useQuery({
+        queryKey: ["document-meta", id],
+        queryFn: async () => {
+            const response = await apiClient.get(`/files/${id}`);
+            return response.data as {
+                project_number: string | null;
+                position: string | null;
+            };
+        },
+    });
+    const canPrintLabel = !!(docMeta?.project_number && docMeta?.position);
+
+    const [labelPickerVisible, setLabelPickerVisible] = useState(false);
+    const [employeeMenuVisible, setEmployeeMenuVisible] = useState(false);
+    const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
+
+    const { data: employees } = useQuery<Employee[]>({
+        queryKey: ["employees"],
+        queryFn: async () => {
+            const response = await apiClient.get("/employees");
+            return response.data;
+        },
+        enabled: labelPickerVisible,
+    });
+
+    const printLabel = useMutation({
+        mutationFn: async () => {
+            if (!docMeta?.project_number || !docMeta?.position || !selectedEmployee) return;
+            const response = await apiClient.post(
+                "/workstations/print-prep-label",
+                {
+                    projectNumber: docMeta.project_number,
+                    position: docMeta.position,
+                    employeeName: selectedEmployee,
+                },
+                { responseType: "arraybuffer" },
+            );
+            const filename = `label_${docMeta.project_number}_${docMeta.position}.pdf`;
+
+            if (Platform.OS === "web") {
+                const blob = new Blob([response.data], { type: "application/pdf" });
+                const url = URL.createObjectURL(blob);
+                window.open(url, "_blank");
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
+                return;
+            }
+
+            const base64 = arrayBufferToBase64(response.data);
+            const fileUri = `${cacheDirectory}${filename}`;
+            await writeAsStringAsync(fileUri, base64, { encoding: EncodingType.Base64 });
+
+            if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(fileUri, {
+                    mimeType: "application/pdf",
+                    dialogTitle: t("document.printLabel"),
+                    UTI: "com.adobe.pdf",
+                });
+            } else {
+                throw new Error(t("document.sharingUnavailable"));
+            }
+        },
+        onSuccess: () => {
+            setLabelPickerVisible(false);
+            setSelectedEmployee(null);
+            setSnackbar({ visible: true, message: t("document.labelPrinted") });
+        },
+        onError: (error: any) => {
+            const msg = error?.response?.data?.error || error.message;
+            setSnackbar({ visible: true, message: t("document.labelPrintError", { msg }) });
+        },
+    });
 
     // Clean up blob URL when leaving edit mode or unmounting
     useEffect(() => {
@@ -158,6 +259,53 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
         console.log("WebView error:", event.nativeEvent);
     }, []);
 
+    const employeePickerModal = (
+        <Portal>
+            <Modal
+                visible={labelPickerVisible}
+                onDismiss={() => setLabelPickerVisible(false)}
+                contentContainerStyle={styles.modal}>
+                <Text variant="titleLarge" style={{ marginBottom: 4 }}>
+                    {t("document.printLabel")}
+                </Text>
+                <Text variant="bodyMedium" style={{ color: "#666", marginBottom: 16 }}>
+                    {t("document.printLabelHint")}
+                </Text>
+                <Menu
+                    visible={employeeMenuVisible}
+                    onDismiss={() => setEmployeeMenuVisible(false)}
+                    anchor={
+                        <TouchableOpacity style={styles.dropdown} onPress={() => setEmployeeMenuVisible(true)}>
+                            <Text style={selectedEmployee ? styles.dropdownText : styles.dropdownPlaceholder}>
+                                {selectedEmployee ?? t("kiosk.selectEmployee")}
+                            </Text>
+                        </TouchableOpacity>
+                    }>
+                    {(employees ?? []).map((emp) => (
+                        <Menu.Item
+                            key={emp.id}
+                            title={emp.name}
+                            onPress={() => {
+                                setSelectedEmployee(emp.name);
+                                setEmployeeMenuVisible(false);
+                            }}
+                        />
+                    ))}
+                    {(employees ?? []).length === 0 && <Menu.Item title={t("kiosk.noEmployees")} disabled />}
+                </Menu>
+                <TouchableOpacity
+                    style={[styles.confirmBtn, (!selectedEmployee || printLabel.isPending) && styles.confirmBtnDisabled]}
+                    activeOpacity={0.8}
+                    disabled={!selectedEmployee || printLabel.isPending}
+                    onPress={() => printLabel.mutate()}>
+                    {printLabel.isPending ?
+                        <ActivityIndicator size="small" color="#fff" />
+                    :   <Text style={styles.confirmBtnText}>{t("document.printLabelConfirm")}</Text>}
+                </TouchableOpacity>
+            </Modal>
+        </Portal>
+    );
+
     // ── web render ──
     if (Platform.OS === "web") {
         return (
@@ -165,6 +313,9 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                 <Appbar.Header>
                     <Appbar.BackAction onPress={() => router.back()} />
                     <Appbar.Content title={mode === "edit" ? t("document.editing") : `${filename}`} />
+                    {mode === "view" && canPrintLabel && (
+                        <Appbar.Action icon="printer" onPress={() => setLabelPickerVisible(true)} disabled={loading} />
+                    )}
                     {mode === "view" && <Appbar.Action icon="pencil" onPress={handleEdit} disabled={loading} />}
                 </Appbar.Header>
                 <View style={styles.viewerContainer}>
@@ -190,6 +341,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                 <Snackbar visible={snackbar.visible} onDismiss={() => setSnackbar({ ...snackbar, visible: false })}>
                     {snackbar.message}
                 </Snackbar>
+                {employeePickerModal}
             </View>
         );
     }
@@ -200,6 +352,9 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
             <Appbar.Header>
                 <Appbar.BackAction onPress={() => router.back()} />
                 <Appbar.Content title={mode === "edit" ? t("document.editing") : `${filename}`} />
+                {mode === "view" && canPrintLabel && (
+                    <Appbar.Action icon="printer" onPress={() => setLabelPickerVisible(true)} disabled={loading} />
+                )}
                 {mode === "view" && <Appbar.Action icon="pencil" onPress={handleEdit} disabled={loading} />}
             </Appbar.Header>
 
@@ -241,6 +396,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
             <Snackbar visible={snackbar.visible} onDismiss={() => setSnackbar({ ...snackbar, visible: false })}>
                 {snackbar.message}
             </Snackbar>
+            {employeePickerModal}
         </View>
     );
 }
@@ -313,4 +469,28 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
     },
+    modal: {
+        backgroundColor: "#fff",
+        marginHorizontal: 24,
+        borderRadius: 16,
+        padding: 24,
+    },
+    dropdown: {
+        borderWidth: 1,
+        borderColor: "#ddd",
+        borderRadius: 8,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        marginBottom: 16,
+    },
+    dropdownText: { fontSize: 16 },
+    dropdownPlaceholder: { fontSize: 16, color: "#aaa" },
+    confirmBtn: {
+        backgroundColor: "#ff5100",
+        borderRadius: 10,
+        paddingVertical: 16,
+        alignItems: "center",
+    },
+    confirmBtnDisabled: { backgroundColor: "#f0c4a8" },
+    confirmBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
 });

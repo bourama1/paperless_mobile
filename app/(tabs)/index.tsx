@@ -198,29 +198,17 @@ export default function WorkstationsScreen() {
                                                 </Text>
                                             </View>
                                         :   null}
-                                        {item.total_cycles && item.total_cycles > 1 ?
-                                            <View style={styles.detailRow}>
-                                                <Text variant="bodySmall" style={styles.label}>
-                                                    {t("workstations.label.cycle")}
-                                                </Text>
-                                                <Text variant="bodySmall" style={styles.value}>
-                                                    {t("workstations.cycleValue", {
-                                                        current: item.cycle_index ?? 1,
-                                                        total: item.total_cycles,
-                                                    })}
-                                                </Text>
-                                            </View>
-                                        : item.current_order_data.quantity > 1 && (
-                                              <View style={styles.detailRow}>
-                                                  <Text variant="bodySmall" style={styles.label}>
-                                                      {t("workstations.label.quantity")}
-                                                  </Text>
-                                                  <Text variant="bodySmall" style={styles.value}>
-                                                      {item.current_order_data.quantity}
-                                                  </Text>
-                                              </View>
-                                          )
-                                        }
+                                        <View style={styles.detailRow}>
+                                            <Text variant="bodySmall" style={styles.label}>
+                                                {t("workstations.label.cycle")}
+                                            </Text>
+                                            <Text variant="bodySmall" style={styles.value}>
+                                                {t("workstations.cycleValue", {
+                                                    current: item.cycle_index ?? 1,
+                                                    total: item.total_cycles ?? 1,
+                                                })}
+                                            </Text>
+                                        </View>
                                     </Card.Content>
                                 :   <Card.Content>
                                         <Text variant="bodyMedium" style={{ color: "#999" }}>

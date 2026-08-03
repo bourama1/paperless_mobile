@@ -5,45 +5,53 @@ import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect, useRouter, useNavigation } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import apiClient from "../../src/api/client";
-import { RevisionsResponse, RevisionOverviewItem } from "../../src/types";
+import { DocumentsOverviewResponse, DocumentOverviewItem, CompletionStatus } from "../../src/types";
 import { t } from "../../src/i18n";
 
-function formatDateKey(date: Date): string {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-}
-
-function formatDisplayDate(date: Date): string {
-    const today = new Date();
-    if (formatDateKey(date) === formatDateKey(today)) {
-        return t("revisions.today");
-    }
-    return date.toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric", year: "numeric" });
-}
-
 function formatTime(iso: string): string {
-    return new Date(iso).toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" });
+    return new Date(iso).toLocaleString("cs-CZ", {
+        day: "numeric",
+        month: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    });
 }
 
-export default function RevisionsScreen() {
+const STATUS_FILTERS: { value: CompletionStatus; label: string; color: string }[] = [
+    { value: "complete", label: "docs.filterComplete", color: "#2e7d32" },
+    { value: "missing_product", label: "docs.filterMissing", color: "#f9a825" },
+    { value: "shipped_incomplete", label: "docs.filterIncomplete", color: "#c62828" },
+];
+
+const STATUS_META: Record<CompletionStatus, { label: string; color: string }> = {
+    complete: { label: "docs.statusComplete", color: "#2e7d32" },
+    missing_product: { label: "docs.statusMissing", color: "#f9a825" },
+    shipped_incomplete: { label: "docs.statusIncomplete", color: "#c62828" },
+};
+
+export default function DocumentsScreen() {
     const router = useRouter();
     const navigation = useNavigation();
-    const [selectedDate, setSelectedDate] = useState(() => new Date());
+    const [statusFilters, setStatusFilters] = useState<Set<CompletionStatus>>(new Set());
+    const [revisionedOnly, setRevisionedOnly] = useState(false);
 
-    const dateKey = formatDateKey(selectedDate);
+    const statusParam = Array.from(statusFilters).join(",");
 
     const {
-        data: revisionsData,
+        data: overview,
         isLoading,
         isError,
         refetch,
         isRefetching,
-    } = useQuery<RevisionsResponse>({
-        queryKey: ["revisions", dateKey],
+    } = useQuery<DocumentsOverviewResponse>({
+        queryKey: ["documents-overview", statusParam, revisionedOnly],
         queryFn: async () => {
-            const response = await apiClient.get("/files", { params: { date: dateKey } });
+            const response = await apiClient.get("/files", {
+                params: {
+                    ...(statusParam ? { status: statusParam } : {}),
+                    ...(revisionedOnly ? { revisioned: "true" } : {}),
+                },
+            });
             return response.data;
         },
     });
@@ -66,122 +74,64 @@ export default function RevisionsScreen() {
         });
     }, [navigation, refetch, isRefetching]);
 
-    const goToPrevDay = () => {
-        const prev = new Date(selectedDate);
-        prev.setDate(prev.getDate() - 1);
-        setSelectedDate(prev);
+    const toggleStatus = (value: CompletionStatus) => {
+        setStatusFilters((prev) => {
+            const next = new Set(prev);
+            if (next.has(value)) next.delete(value);
+            else next.add(value);
+            return next;
+        });
     };
 
-    const goToNextDay = () => {
-        const next = new Date(selectedDate);
-        next.setDate(next.getDate() + 1);
-        setSelectedDate(next);
-    };
-
-    const goToToday = () => {
-        setSelectedDate(new Date());
-    };
-
-    const items = revisionsData?.items ?? [];
-
-    if (isLoading && !isRefetching) {
-        return (
-            <View style={styles.center}>
-                <ActivityIndicator size="large" />
-            </View>
-        );
-    }
-
-    if (isError) {
-        return (
-            <View style={styles.center}>
-                <Text variant="titleMedium">{t("revisions.error")}</Text>
-                <TouchableOpacity
-                    style={[styles.pillBtn, styles.pillBtnPrimary]}
-                    activeOpacity={0.8}
-                    onPress={() => refetch()}>
-                    <Text style={styles.pillBtnText}>{t("workstations.retry")}</Text>
-                </TouchableOpacity>
-            </View>
-        );
-    }
+    const items = overview?.items ?? [];
 
     return (
         <View style={styles.container}>
-            <View style={styles.dateNav}>
-                <TouchableOpacity onPress={goToPrevDay} style={styles.dateArrow} activeOpacity={0.6}>
-                    <Ionicons name="chevron-back" size={24} color="#ff5100" />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={goToToday} activeOpacity={0.6}>
-                    <Text variant="titleMedium" style={styles.dateText}>
-                        {formatDisplayDate(selectedDate)}
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={goToNextDay} style={styles.dateArrow} activeOpacity={0.6}>
-                    <Ionicons name="chevron-forward" size={24} color="#ff5100" />
-                </TouchableOpacity>
+            <View style={styles.filterRow}>
+                {STATUS_FILTERS.map((f) => (
+                    <Chip
+                        key={f.value}
+                        mode={statusFilters.has(f.value) ? "flat" : "outlined"}
+                        selected={statusFilters.has(f.value)}
+                        onPress={() => toggleStatus(f.value)}
+                        style={[styles.filterChip, statusFilters.has(f.value) && { backgroundColor: f.color }]}
+                        textStyle={statusFilters.has(f.value) ? styles.filterChipTextSelected : styles.filterChipText}>
+                        {t(f.label)}
+                    </Chip>
+                ))}
+                <Chip
+                    mode={revisionedOnly ? "flat" : "outlined"}
+                    selected={revisionedOnly}
+                    onPress={() => setRevisionedOnly((v) => !v)}
+                    style={[styles.filterChip, revisionedOnly && { backgroundColor: "#ff5100" }]}
+                    textStyle={revisionedOnly ? styles.filterChipTextSelected : styles.filterChipText}>
+                    {t("docs.filterRevisioned")}
+                </Chip>
             </View>
-            {items.length > 0 ?
+            <Divider />
+
+            {isLoading && !isRefetching ?
+                <View style={styles.center}>
+                    <ActivityIndicator size="large" />
+                </View>
+            : isError ?
+                <View style={styles.center}>
+                    <Text variant="titleMedium">{t("revisions.error")}</Text>
+                    <TouchableOpacity
+                        style={[styles.pillBtn, styles.pillBtnPrimary]}
+                        activeOpacity={0.8}
+                        onPress={() => refetch()}>
+                        <Text style={styles.pillBtnText}>{t("workstations.retry")}</Text>
+                    </TouchableOpacity>
+                </View>
+            : items.length > 0 ?
                 <FlatList
                     data={items}
                     keyExtractor={(item) => item.document_id.toString()}
                     onRefresh={refetch}
                     refreshing={isRefetching}
                     contentContainerStyle={styles.list}
-                    renderItem={({ item }) => (
-                        <TouchableOpacity
-                            onPress={() => {
-                                const latest = item.revisions[item.revisions.length - 1];
-                                router.push({
-                                    pathname: `/document/${item.document_id}`,
-                                    params: {
-                                        filename: latest?.filename || "",
-                                        version: latest?.version || 1,
-                                    },
-                                });
-                            }}
-                            activeOpacity={0.7}>
-                            <Card style={styles.card} mode="outlined">
-                                <Card.Title
-                                    title={item.document_name}
-                                    titleStyle={styles.cardTitle}
-                                    right={() => (
-                                        <View style={styles.chipRow}>
-                                            {item.revisions.some((r) => r.has_annotations) && (
-                                                <Chip
-                                                    mode="flat"
-                                                    compact
-                                                    style={styles.annotatedChip}
-                                                    textStyle={styles.chipText}>
-                                                    {t("revisions.annotated")}
-                                                </Chip>
-                                            )}
-                                            <Chip
-                                                mode="flat"
-                                                compact
-                                                style={styles.revisionChip}
-                                                textStyle={styles.chipText}>
-                                                {item.revisions.length} {t("revisions.revisions")}
-                                            </Chip>
-                                        </View>
-                                    )}
-                                />
-                                <Card.Content>
-                                    <Divider style={{ marginBottom: 8 }} />
-                                    {item.revisions.slice().reverse().map((rev) => (
-                                        <View key={rev.id} style={styles.revisionRow}>
-                                            <Text variant="bodySmall" style={styles.revisionFilename} numberOfLines={1}>
-                                                v{rev.version} — {rev.filename}
-                                            </Text>
-                                            <Text variant="bodySmall" style={styles.revisionTime}>
-                                                {formatTime(rev.created_at)}
-                                            </Text>
-                                        </View>
-                                    ))}
-                                </Card.Content>
-                            </Card>
-                        </TouchableOpacity>
-                    )}
+                    renderItem={({ item }) => <DocumentCard item={item} router={router} />}
                 />
             :   <View style={styles.center}>
                     <Text variant="bodyLarge">{t("revisions.empty")}</Text>
@@ -191,26 +141,86 @@ export default function RevisionsScreen() {
     );
 }
 
+function DocumentCard({ item, router }: { item: DocumentOverviewItem; router: ReturnType<typeof useRouter> }) {
+    const statusMeta = item.status ? STATUS_META[item.status] : null;
+    const latest = item.revisions[0]; // revisions come back version-desc from the backend
+
+    return (
+        <TouchableOpacity
+            onPress={() =>
+                router.push({
+                    pathname: `/document/${item.document_id}`,
+                    params: {
+                        filename: latest?.filename || "",
+                        version: latest?.version || 1,
+                    },
+                })
+            }
+            activeOpacity={0.7}>
+            <Card style={styles.card} mode="outlined">
+                <Card.Title
+                    title={item.document_name}
+                    titleStyle={styles.cardTitle}
+                    subtitle={
+                        item.project_number && item.position ? `${item.project_number} / ${item.position}` : undefined
+                    }
+                    right={() => (
+                        <View style={styles.chipRow}>
+                            {item.revisioned && (
+                                <Chip mode="flat" compact style={styles.revisionedChip} textStyle={styles.chipText}>
+                                    {t("docs.filterRevisioned")}
+                                </Chip>
+                            )}
+                            {statusMeta && (
+                                <Chip
+                                    mode="flat"
+                                    compact
+                                    style={[styles.statusChip, { backgroundColor: statusMeta.color }]}
+                                    textStyle={styles.chipText}>
+                                    {t(statusMeta.label)}
+                                </Chip>
+                            )}
+                        </View>
+                    )}
+                />
+                {item.revisions.length > 0 && (
+                    <Card.Content>
+                        <Divider style={{ marginBottom: 8 }} />
+                        {item.revisions.map((rev) => (
+                            <View key={rev.id} style={styles.revisionRow}>
+                                <Text variant="bodySmall" style={styles.revisionFilename} numberOfLines={1}>
+                                    {rev.is_edited ? `v${rev.version} — ${rev.filename}` : t("docs.originalImport")}
+                                </Text>
+                                <Text variant="bodySmall" style={styles.revisionTime}>
+                                    {formatTime(rev.created_at)}
+                                </Text>
+                            </View>
+                        ))}
+                    </Card.Content>
+                )}
+            </Card>
+        </TouchableOpacity>
+    );
+}
+
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: "#fff" },
     center: { flex: 1, justifyContent: "center", alignItems: "center" },
-    dateNav: {
+    filterRow: {
         flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: "#e0e0e0",
+        flexWrap: "wrap",
+        gap: 8,
+        padding: 12,
     },
-    dateArrow: { padding: 8 },
-    dateText: { fontWeight: "bold", marginHorizontal: 16 },
+    filterChip: {},
+    filterChipText: { color: "#333" },
+    filterChipTextSelected: { color: "#fff" },
     list: { padding: 12 },
     card: { marginBottom: 12 },
     cardTitle: { fontWeight: "bold", flex: 1 },
     chipRow: { flexDirection: "row", marginRight: 12, gap: 6 },
-    annotatedChip: { backgroundColor: "#ff5100" },
-    revisionChip: { backgroundColor: "#e0e0e0" },
+    revisionedChip: { backgroundColor: "#607d8b" },
+    statusChip: {},
     chipText: { fontSize: 11, color: "#fff" },
     revisionRow: {
         flexDirection: "row",
@@ -229,5 +239,5 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     pillBtnPrimary: { backgroundColor: "#ff5100" },
-    pillBtnText: { color: "#fff", fontSize: 14, fontWeight: "600" },
+    pillBtnText: { color: "#fff", fontWeight: "600" },
 });

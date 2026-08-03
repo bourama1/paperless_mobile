@@ -58,16 +58,24 @@ export interface RevisionOverview {
   version: number;
   created_at: string;
   has_annotations: boolean;
+  is_edited: boolean;
 }
 
-export interface RevisionOverviewItem {
+export type CompletionStatus = "complete" | "missing_product" | "shipped_incomplete";
+
+export interface DocumentOverviewItem {
   document_id: number;
   document_name: string;
+  project_number: string | null;
+  position: string | null;
+  document_type: number | null;
+  created_at: string;
   updated_at: string;
+  status: CompletionStatus | null;
+  revisioned: boolean;
   revisions: RevisionOverview[];
 }
 
-export interface RevisionsResponse {
-  date: string;
-  items: RevisionOverviewItem[];
+export interface DocumentsOverviewResponse {
+  items: DocumentOverviewItem[];
 }
