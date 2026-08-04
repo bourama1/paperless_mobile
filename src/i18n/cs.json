@@ -1,6 +1,6 @@
 {
     "workstations.title": "Pracoviště",
-    "search.title": "Hledat PBOM",
+    "search.title": "Hledat BOM",
     "document.title": "Dokument",
     "workstations.error": "Chyba při načítání pracovišť",
     "workstations.retry": "Znovu",

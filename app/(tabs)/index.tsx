@@ -1,10 +1,11 @@
-import React, { useState, useCallback, useLayoutEffect, useMemo } from "react";
+import React, { useState, useCallback, useLayoutEffect, useMemo, useEffect } from "react";
 import { FlatList, View, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Card, Text, Chip, Divider, Snackbar } from "react-native-paper";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useFocusEffect, useRouter, useNavigation } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import apiClient from "../../src/api/client";
+import socket from "../../src/services/socket";
 import { Workstation } from "../../src/types";
 import { t } from "../../src/i18n";
 
@@ -32,6 +33,21 @@ export default function WorkstationsScreen() {
             refetch();
         }, [refetch]),
     );
+
+    // Live refresh: cycle_index/total_cycles only get updated on the
+    // backend by STARTED/FINISHED order-update calls (the polling feed
+    // that GET /workstations mostly reflects doesn't carry cycle info at
+    // all) — so without this, the card would show stale cycle progress
+    // until the next scheduled poll tick or a manual pull-to-refresh.
+    useEffect(() => {
+        const onOrderUpdate = () => refetch();
+        socket.on("workstation-order-update", onOrderUpdate);
+        socket.on("workstations-updated", onOrderUpdate);
+        return () => {
+            socket.off("workstation-order-update", onOrderUpdate);
+            socket.off("workstations-updated", onOrderUpdate);
+        };
+    }, [refetch]);
 
     const importPbom = useMutation({
         mutationFn: async (order: NonNullable<Workstation["current_order_data"]>) => {

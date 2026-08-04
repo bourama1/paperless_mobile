@@ -417,13 +417,17 @@ function StatusKiosk({ workstation, onChangeWorkstation }: { workstation: string
         };
     }, []);
 
-    // Live-refresh the instant the backend's poll picks up a change, rather
-    // than waiting for the fallback interval above.
+    // Live-refresh the instant either the poll picks up a change, or an
+    // order-update (STARTED/FINISHED) arrives — the latter is what
+    // actually carries cycle_index/total_cycles, so listening only to the
+    // poll event would leave cycle progress stale until the next poll tick.
     useEffect(() => {
-        const onWorkstationsUpdated = () => refetch();
-        socket.on("workstations-updated", onWorkstationsUpdated);
+        const onUpdate = () => refetch();
+        socket.on("workstations-updated", onUpdate);
+        socket.on("workstation-order-update", onUpdate);
         return () => {
-            socket.off("workstations-updated", onWorkstationsUpdated);
+            socket.off("workstations-updated", onUpdate);
+            socket.off("workstation-order-update", onUpdate);
         };
     }, [refetch]);
 
