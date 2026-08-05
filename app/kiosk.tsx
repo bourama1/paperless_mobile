@@ -10,6 +10,10 @@ import socket from "../src/services/socket";
 import { Workstation, WorkstationOrder } from "../src/types";
 import { t } from "../src/i18n";
 
+// Sentinel value used when Completion mode should accept FINISHED events for any
+// workplace without showing or storing a human-visible workplace label.
+const ANY_WORKPLACE = "__ANY__";
+
 interface OrderUpdatePayload {
     order: WorkstationOrder;
     cycleIndex: number;
@@ -98,7 +102,12 @@ export default function KioskScreen() {
                     <TouchableOpacity
                         style={styles.modeCard}
                         activeOpacity={0.7}
-                        onPress={() => setMode("completion")}>
+                        onPress={() => {
+                            // Default to finishing any workplace without requiring the user
+                            // to pick a specific work-TYPE.
+                            setMode("completion");
+                            setSelection(ANY_WORKPLACE);
+                        }}>
                         <Ionicons name="checkmark-done-circle-outline" size={40} color="#ff5100" />
                         <Text style={styles.modeCardTitle}>{t("kiosk.modeCompletion")}</Text>
                         <Text style={styles.modeCardHint}>{t("kiosk.modeCompletionHint")}</Text>
@@ -215,7 +224,7 @@ function CompletionKiosk({
     useEffect(() => {
         const onOrderUpdate = (update: OrderUpdatePayload) => {
             if (update.action !== "FINISHED") return;
-            if (update.order.workplace !== workstationRef.current) return;
+            if (workstationRef.current !== ANY_WORKPLACE && update.order.workplace !== workstationRef.current) return;
             setPending((prev) => [...prev, update]);
         };
         socket.on("workstation-order-update", onOrderUpdate);
@@ -268,7 +277,7 @@ function CompletionKiosk({
             <View style={styles.idleBody}>
                 <Ionicons name="checkmark-done-circle-outline" size={72} color="#e0e0e0" />
                 <Text variant="headlineMedium" style={styles.idleWorkstation}>
-                    {workstation}
+                    {workstation !== ANY_WORKPLACE ? workstation : null}
                 </Text>
                 <Text variant="bodyLarge" style={styles.idleHint}>
                     {t("kiosk.waiting")}
@@ -323,7 +332,9 @@ function CompletionKiosk({
                                         }}
                                     />
                                 ))}
-                                {(employees ?? []).length === 0 && <Menu.Item title={t("kiosk.noEmployees")} disabled />}
+                                {(employees ?? []).length === 0 && (
+                                    <Menu.Item title={t("kiosk.noEmployees")} disabled />
+                                )}
                             </Menu>
 
                             <Text variant="labelLarge" style={[styles.sectionLabel, { marginTop: 16 }]}>
