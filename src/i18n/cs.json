@@ -102,5 +102,10 @@
     "document.printLabelConfirm": "Vytisknout štítek",
     "document.labelPrinted": "Štítek byl vytisknut.",
     "document.labelPrintError": "Chyba při tisku štítku: {msg}",
-    "document.sharingUnavailable": "Sdílení souborů není na tomto zařízení dostupné"
+    "document.sharingUnavailable": "Sdílení souborů není na tomto zařízení dostupné",
+    "document.finishTitle": "Dokončit zakázku",
+    "document.finishHint": "Kdo dokončuje tuto zakázku?",
+    "document.finishConfirm": "Potvrdit dokončení",
+    "document.finishSuccess": "Zakázka byla dokončena.",
+    "document.finishError": "Nepodařilo se dokončit zakázku: {msg}"
 }

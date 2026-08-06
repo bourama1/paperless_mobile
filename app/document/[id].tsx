@@ -2,13 +2,31 @@ import React, { useState, useCallback, useEffect, useRef } from "react";
 import { View, StyleSheet, ActivityIndicator, Platform, TouchableOpacity } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Appbar, Snackbar, Portal, Modal, Menu, Text } from "react-native-paper";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
 import { Asset } from "expo-asset";
 import { readAsStringAsync, writeAsStringAsync, cacheDirectory, EncodingType } from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import apiClient, { BASE_URL } from "../../src/api/client";
 import { t } from "../../src/i18n";
+import { CompletionContext, CompletionStatus } from "../../src/types";
+
+interface Employee {
+    id: number;
+    name: string;
+}
+
+interface DocumentMeta {
+    project_number: string | null;
+    position: string | null;
+    status: CompletionStatus | null;
+    revisioned: boolean;
+    completion: CompletionContext | null;
+}
+
+// Statuses that represent an order closed out without actually being
+// finished — the "Finish order" action only applies to these.
+const UNFINISHED_STATUSES: CompletionStatus[] = ["missing_product", "shipped_incomplete"];
 
 interface Employee {
     id: number;
@@ -53,13 +71,66 @@ export default function DocumentViewerScreen() {
         queryKey: ["document-meta", id],
         queryFn: async () => {
             const response = await apiClient.get(`/files/${id}`);
-            return response.data as {
-                project_number: string | null;
-                position: string | null;
-            };
+            return response.data as DocumentMeta;
         },
     });
     const canPrintLabel = !!(docMeta?.project_number && docMeta?.position);
+
+    // ── "Finish order" action ──
+    // Only offered from inside an opened, revisioned document whose order
+    // was closed as missing_product/shipped_incomplete — i.e. someone has
+    // actually reviewed this document before finishing the order, not just
+    // tapped a button from the overview list.
+    const canFinishOrder =
+        !!docMeta &&
+        docMeta.revisioned &&
+        !!docMeta.status &&
+        UNFINISHED_STATUSES.includes(docMeta.status) &&
+        !!docMeta.completion;
+
+    const queryClient = useQueryClient();
+    const [finishModalVisible, setFinishModalVisible] = useState(false);
+    const [finishEmployeeMenuVisible, setFinishEmployeeMenuVisible] = useState(false);
+    const [finishSelectedEmployee, setFinishSelectedEmployee] = useState<string | null>(null);
+
+    const { data: finishEmployees } = useQuery<Employee[]>({
+        queryKey: ["employees"],
+        queryFn: async () => {
+            const response = await apiClient.get("/employees");
+            return response.data;
+        },
+        enabled: finishModalVisible,
+    });
+
+    const finishOrder = useMutation({
+        mutationFn: async () => {
+            if (!docMeta?.completion || !finishSelectedEmployee) return;
+            const c = docMeta.completion;
+            await apiClient.post("/workstations/order-completion", {
+                orderId: c.order_id,
+                workstation: c.workstation,
+                cycleIndex: c.cycle_index,
+                totalCycles: c.total_cycles,
+                productOrder: c.product_order,
+                projectNumber: docMeta.project_number,
+                position: docMeta.position,
+                salesOrder: c.sales_order,
+                employeeName: finishSelectedEmployee,
+                status: "complete",
+            });
+        },
+        onSuccess: () => {
+            setFinishModalVisible(false);
+            setFinishSelectedEmployee(null);
+            setSnackbar({ visible: true, message: t("document.finishSuccess") });
+            queryClient.invalidateQueries({ queryKey: ["document-meta", id] });
+            queryClient.invalidateQueries({ queryKey: ["documents-overview"] });
+        },
+        onError: (error: any) => {
+            const msg = error?.response?.data?.error || error.message;
+            setSnackbar({ visible: true, message: t("document.finishError", { msg }) });
+        },
+    });
 
     const [labelPickerVisible, setLabelPickerVisible] = useState(false);
     const [employeeMenuVisible, setEmployeeMenuVisible] = useState(false);
@@ -306,6 +377,56 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
         </Portal>
     );
 
+    const finishModal = (
+        <Portal>
+            <Modal
+                visible={finishModalVisible}
+                onDismiss={() => setFinishModalVisible(false)}
+                contentContainerStyle={styles.modal}>
+                <Text variant="titleLarge" style={{ marginBottom: 4 }}>
+                    {t("document.finishTitle")}
+                </Text>
+                <Text variant="bodyMedium" style={{ color: "#666", marginBottom: 16 }}>
+                    {t("document.finishHint")}
+                </Text>
+                <Menu
+                    visible={finishEmployeeMenuVisible}
+                    onDismiss={() => setFinishEmployeeMenuVisible(false)}
+                    anchor={
+                        <TouchableOpacity style={styles.dropdown} onPress={() => setFinishEmployeeMenuVisible(true)}>
+                            <Text style={finishSelectedEmployee ? styles.dropdownText : styles.dropdownPlaceholder}>
+                                {finishSelectedEmployee ?? t("kiosk.selectEmployee")}
+                            </Text>
+                        </TouchableOpacity>
+                    }>
+                    {(finishEmployees ?? []).map((emp) => (
+                        <Menu.Item
+                            key={emp.id}
+                            title={emp.name}
+                            onPress={() => {
+                                setFinishSelectedEmployee(emp.name);
+                                setFinishEmployeeMenuVisible(false);
+                            }}
+                        />
+                    ))}
+                    {(finishEmployees ?? []).length === 0 && <Menu.Item title={t("kiosk.noEmployees")} disabled />}
+                </Menu>
+                <TouchableOpacity
+                    style={[
+                        styles.confirmBtn,
+                        (!finishSelectedEmployee || finishOrder.isPending) && styles.confirmBtnDisabled,
+                    ]}
+                    activeOpacity={0.8}
+                    disabled={!finishSelectedEmployee || finishOrder.isPending}
+                    onPress={() => finishOrder.mutate()}>
+                    {finishOrder.isPending ?
+                        <ActivityIndicator size="small" color="#fff" />
+                    :   <Text style={styles.confirmBtnText}>{t("document.finishConfirm")}</Text>}
+                </TouchableOpacity>
+            </Modal>
+        </Portal>
+    );
+
     // ── web render ──
     if (Platform.OS === "web") {
         return (
@@ -313,6 +434,14 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                 <Appbar.Header>
                     <Appbar.BackAction onPress={() => router.back()} />
                     <Appbar.Content title={mode === "edit" ? t("document.editing") : `${filename}`} />
+                    {mode === "view" && canFinishOrder && (
+                        <Appbar.Action
+                            icon="flag-checkered"
+                            color="#2e7d32"
+                            onPress={() => setFinishModalVisible(true)}
+                            disabled={loading}
+                        />
+                    )}
                     {mode === "view" && canPrintLabel && (
                         <Appbar.Action icon="printer" onPress={() => setLabelPickerVisible(true)} disabled={loading} />
                     )}
@@ -342,6 +471,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                     {snackbar.message}
                 </Snackbar>
                 {employeePickerModal}
+                {finishModal}
             </View>
         );
     }
@@ -352,6 +482,14 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
             <Appbar.Header>
                 <Appbar.BackAction onPress={() => router.back()} />
                 <Appbar.Content title={mode === "edit" ? t("document.editing") : `${filename}`} />
+                {mode === "view" && canFinishOrder && (
+                    <Appbar.Action
+                        icon="flag-checkered"
+                        color="#2e7d32"
+                        onPress={() => setFinishModalVisible(true)}
+                        disabled={loading}
+                    />
+                )}
                 {mode === "view" && canPrintLabel && (
                     <Appbar.Action icon="printer" onPress={() => setLabelPickerVisible(true)} disabled={loading} />
                 )}
@@ -397,6 +535,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                 {snackbar.message}
             </Snackbar>
             {employeePickerModal}
+            {finishModal}
         </View>
     );
 }

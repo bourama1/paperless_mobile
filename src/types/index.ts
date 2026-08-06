@@ -63,6 +63,15 @@ export interface RevisionOverview {
 
 export type CompletionStatus = "complete" | "missing_product" | "shipped_incomplete";
 
+export interface CompletionContext {
+  order_id: string;
+  workstation: string;
+  cycle_index: number;
+  total_cycles: number;
+  product_order: string | null;
+  sales_order: string | null;
+}
+
 export interface DocumentOverviewItem {
   document_id: number;
   document_name: string;
