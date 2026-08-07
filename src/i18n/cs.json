@@ -107,5 +107,16 @@
     "document.finishHint": "Kdo dokončuje tuto zakázku?",
     "document.finishConfirm": "Potvrdit dokončení",
     "document.finishSuccess": "Zakázka byla dokončena.",
-    "document.finishError": "Nepodařilo se dokončit zakázku: {msg}"
+    "document.finishError": "Nepodařilo se dokončit zakázku: {msg}",
+    "prepQueue.tabTitle": "Příprava",
+    "prepQueue.filterAllDays": "Všechny dny",
+    "prepQueue.empty": "Fronta přípravy je prázdná.",
+    "prepQueue.quantity": "Množství",
+    "prepQueue.plannedDate": "Plánované datum",
+    "prepQueue.label": "Štítek",
+    "prepQueue.salesOrder": "Zakázka",
+    "prepQueue.prepare": "Připravit",
+    "prepQueue.refreshFoundNew": "Načteno {count} nových položek.",
+    "prepQueue.refreshNothingNew": "Žádný nový plán k dispozici.",
+    "prepQueue.refreshError": "Nepodařilo se zkontrolovat nový plán."
 }

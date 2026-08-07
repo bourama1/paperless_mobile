@@ -37,6 +37,13 @@ export default function TabLayout() {
                     tabBarIcon: ({ color, size }) => <Ionicons name="document-text" size={size} color={color} />,
                 }}
             />
+            <Tabs.Screen
+                name="prep-queue"
+                options={{
+                    title: t("prepQueue.tabTitle"),
+                    tabBarIcon: ({ color, size }) => <Ionicons name="cube-outline" size={size} color={color} />,
+                }}
+            />
         </Tabs>
     );
 }
