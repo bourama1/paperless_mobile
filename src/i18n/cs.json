@@ -116,6 +116,8 @@
     "prepQueue.label": "Štítek",
     "prepQueue.salesOrder": "Zakázka",
     "prepQueue.prepare": "Připravit",
+    "prepQueue.openBom": "Zobrazit BOM",
+    "prepQueue.openBomError": "Nepodařilo se otevřít BOM: {msg}",
     "prepQueue.refreshFoundNew": "Načteno {count} nových položek.",
     "prepQueue.refreshNothingNew": "Žádný nový plán k dispozici.",
     "prepQueue.refreshError": "Nepodařilo se zkontrolovat nový plán."

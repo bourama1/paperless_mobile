@@ -1,18 +1,11 @@
 import React, { useState, useMemo, useLayoutEffect } from "react";
-import { FlatList, View, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from "react-native";
-import { Card, Text, Chip, Divider, Portal, Modal, Menu, Snackbar } from "react-native-paper";
+import { FlatList, View, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
+import { Card, Text, Chip, Divider, Snackbar } from "react-native-paper";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useNavigation } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { writeAsStringAsync, cacheDirectory, EncodingType } from "expo-file-system/legacy";
-import * as Sharing from "expo-sharing";
 import apiClient from "../../src/api/client";
 import { t } from "../../src/i18n";
-
-interface Employee {
-    id: number;
-    name: string;
-}
 
 interface PrepQueueItem {
     id: number;
@@ -24,25 +17,6 @@ interface PrepQueueItem {
     production_time: number | null;
     planned_date: string | null;
     plan_label: string | null;
-}
-
-// Self-contained base64 encoder — avoids depending on btoa being polyfilled
-// in the RN/Hermes runtime, which isn't guaranteed. Same as document/[id].tsx.
-const BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
-    let result = "";
-    for (let i = 0; i < bytes.length; i += 3) {
-        const b1 = bytes[i]!;
-        const b2 = i + 1 < bytes.length ? bytes[i + 1]! : undefined;
-        const b3 = i + 2 < bytes.length ? bytes[i + 2]! : undefined;
-        const triplet = (b1 << 16) | ((b2 ?? 0) << 8) | (b3 ?? 0);
-        result += BASE64_CHARS[(triplet >> 18) & 0x3f];
-        result += BASE64_CHARS[(triplet >> 12) & 0x3f];
-        result += b2 !== undefined ? BASE64_CHARS[(triplet >> 6) & 0x3f] : "=";
-        result += b3 !== undefined ? BASE64_CHARS[triplet & 0x3f] : "=";
-    }
-    return result;
 }
 
 function formatDate(iso: string): string {
@@ -61,12 +35,10 @@ function dateKey(iso: string): string {
 
 export default function PrepQueueScreen() {
     const navigation = useNavigation();
+    const router = useRouter();
     const queryClient = useQueryClient();
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [selectedWorkplaces, setSelectedWorkplaces] = useState<Set<string>>(new Set());
-    const [prepTarget, setPrepTarget] = useState<PrepQueueItem | null>(null);
-    const [employeeMenuVisible, setEmployeeMenuVisible] = useState(false);
-    const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
     const [snackbar, setSnackbar] = useState({ visible: false, message: "" });
 
     const {
@@ -152,68 +124,35 @@ export default function PrepQueueScreen() {
         });
     };
 
-    const { data: employees } = useQuery<Employee[]>({
-        queryKey: ["employees"],
-        queryFn: async () => {
-            const response = await apiClient.get("/employees");
+    // Opens the BOM for review — printing the prep label happens from the
+    // document viewer itself (see app/document/[id].tsx), reached only via
+    // this navigation (fromPrepQueue: "1"). The worker needs to actually
+    // see what to prepare before finishing/printing, so "Prepare" is a
+    // two-step flow: open the BOM here, then print from inside it once
+    // they've reviewed it.
+    const openBom = useMutation({
+        mutationFn: async (item: PrepQueueItem) => {
+            const response = await apiClient.post("/workstations/import-pbom", {
+                projectNumber: item.project_number,
+                position: item.position,
+                workplace: item.workplace,
+            });
             return response.data;
         },
-        enabled: !!prepTarget,
-    });
-
-    const closePrepModal = () => {
-        setPrepTarget(null);
-        setSelectedEmployee(null);
-        setEmployeeMenuVisible(false);
-    };
-
-    const printPrepLabel = useMutation({
-        mutationFn: async () => {
-            if (!prepTarget || !selectedEmployee) return;
-            const response = await apiClient.post(
-                "/workstations/print-prep-label",
-                {
-                    projectNumber: prepTarget.project_number,
-                    position: prepTarget.position,
-                    employeeName: selectedEmployee,
+        onSuccess: (doc: any) => {
+            const latest = doc.revisions?.[0];
+            router.push({
+                pathname: `/document/${doc.id}`,
+                params: {
+                    filename: latest?.filename || doc.name || "",
+                    version: latest?.version || 1,
+                    fromPrepQueue: "1",
                 },
-                { responseType: "arraybuffer" },
-            );
-            const filename = `label_${prepTarget.project_number}_${prepTarget.position}.pdf`;
-
-            if (Platform.OS === "web") {
-                const blob = new Blob([response.data], { type: "application/pdf" });
-                const url = URL.createObjectURL(blob);
-                window.open(url, "_blank");
-                setTimeout(() => URL.revokeObjectURL(url), 60000);
-                return;
-            }
-
-            const base64 = arrayBufferToBase64(response.data);
-            const fileUri = `${cacheDirectory}${filename}`;
-            await writeAsStringAsync(fileUri, base64, { encoding: EncodingType.Base64 });
-
-            if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(fileUri, {
-                    mimeType: "application/pdf",
-                    dialogTitle: t("document.printLabel"),
-                    UTI: "com.adobe.pdf",
-                });
-            } else {
-                throw new Error(t("document.sharingUnavailable"));
-            }
-        },
-        onSuccess: () => {
-            closePrepModal();
-            setSnackbar({ visible: true, message: t("document.labelPrinted") });
-            // The item is excluded from the queue once order_preparation_log
-            // has a matching row, which print-prep-label just created — drop
-            // it from the list immediately rather than waiting on a manual refresh.
-            queryClient.invalidateQueries({ queryKey: ["prep-queue"] });
+            });
         },
         onError: (error: any) => {
             const msg = error?.response?.data?.error || error.message;
-            setSnackbar({ visible: true, message: t("document.labelPrintError", { msg }) });
+            setSnackbar({ visible: true, message: t("prepQueue.openBomError", { msg }) });
         },
     });
 
@@ -246,8 +185,8 @@ export default function PrepQueueScreen() {
                         <Chip
                             key={wp}
                             mode={selectedWorkplaces.has(wp) ? "flat" : "outlined"}
-                            selected={selectedWorkplaces.has(wp)}
                             onPress={() => toggleWorkplace(wp)}
+                            selected={selectedWorkplaces.has(wp)}
                             style={[styles.filterChip, selectedWorkplaces.has(wp) && styles.filterChipActive]}
                             textStyle={
                                 selectedWorkplaces.has(wp) ? styles.filterChipTextSelected : styles.filterChipText
@@ -281,67 +220,18 @@ export default function PrepQueueScreen() {
                     refreshing={isRefetching}
                     contentContainerStyle={styles.list}
                     renderItem={({ item }) => (
-                        <PrepQueueCard item={item} onPrepare={() => setPrepTarget(item)} />
+                        <PrepQueueCard
+                            item={item}
+                            isOpening={openBom.isPending && openBom.variables?.id === item.id}
+                            disabled={openBom.isPending}
+                            onPrepare={() => openBom.mutate(item)}
+                        />
                     )}
                 />
             :   <View style={styles.center}>
                     <Text variant="bodyLarge">{t("prepQueue.empty")}</Text>
                 </View>
             }
-
-            <Portal>
-                <Modal visible={!!prepTarget} onDismiss={closePrepModal} contentContainerStyle={styles.modal}>
-                    {prepTarget && (
-                        <>
-                            <Text variant="titleLarge" style={{ marginBottom: 4 }}>
-                                {t("document.printLabel")}
-                            </Text>
-                            <Text variant="bodyMedium" style={{ color: "#666", marginBottom: 16 }}>
-                                {prepTarget.project_number} / {prepTarget.position}
-                            </Text>
-                            <Menu
-                                visible={employeeMenuVisible}
-                                onDismiss={() => setEmployeeMenuVisible(false)}
-                                anchor={
-                                    <TouchableOpacity
-                                        style={styles.dropdown}
-                                        onPress={() => setEmployeeMenuVisible(true)}>
-                                        <Text
-                                            style={selectedEmployee ? styles.dropdownText : styles.dropdownPlaceholder}>
-                                            {selectedEmployee ?? t("kiosk.selectEmployee")}
-                                        </Text>
-                                    </TouchableOpacity>
-                                }>
-                                {(employees ?? []).map((emp) => (
-                                    <Menu.Item
-                                        key={emp.id}
-                                        title={emp.name}
-                                        onPress={() => {
-                                            setSelectedEmployee(emp.name);
-                                            setEmployeeMenuVisible(false);
-                                        }}
-                                    />
-                                ))}
-                                {(employees ?? []).length === 0 && (
-                                    <Menu.Item title={t("kiosk.noEmployees")} disabled />
-                                )}
-                            </Menu>
-                            <TouchableOpacity
-                                style={[
-                                    styles.confirmBtn,
-                                    (!selectedEmployee || printPrepLabel.isPending) && styles.confirmBtnDisabled,
-                                ]}
-                                activeOpacity={0.8}
-                                disabled={!selectedEmployee || printPrepLabel.isPending}
-                                onPress={() => printPrepLabel.mutate()}>
-                                {printPrepLabel.isPending ?
-                                    <ActivityIndicator size="small" color="#fff" />
-                                :   <Text style={styles.confirmBtnText}>{t("document.printLabelConfirm")}</Text>}
-                            </TouchableOpacity>
-                        </>
-                    )}
-                </Modal>
-            </Portal>
 
             <Snackbar
                 visible={snackbar.visible}
@@ -353,7 +243,17 @@ export default function PrepQueueScreen() {
     );
 }
 
-function PrepQueueCard({ item, onPrepare }: { item: PrepQueueItem; onPrepare: () => void }) {
+function PrepQueueCard({
+    item,
+    isOpening,
+    disabled,
+    onPrepare,
+}: {
+    item: PrepQueueItem;
+    isOpening: boolean;
+    disabled: boolean;
+    onPrepare: () => void;
+}) {
     return (
         <Card style={styles.card} mode="outlined">
             <Card.Title
@@ -392,8 +292,14 @@ function PrepQueueCard({ item, onPrepare }: { item: PrepQueueItem; onPrepare: ()
                 )}
             </Card.Content>
             <Card.Actions>
-                <TouchableOpacity style={[styles.confirmBtn, styles.cardConfirmBtn]} activeOpacity={0.8} onPress={onPrepare}>
-                    <Text style={styles.confirmBtnText}>{t("prepQueue.prepare")}</Text>
+                <TouchableOpacity
+                    style={[styles.confirmBtn, styles.cardConfirmBtn, disabled && styles.confirmBtnDisabled]}
+                    activeOpacity={0.8}
+                    disabled={disabled}
+                    onPress={onPrepare}>
+                    {isOpening ?
+                        <ActivityIndicator size="small" color="#fff" />
+                    :   <Text style={styles.confirmBtnText}>{t("prepQueue.openBom")}</Text>}
                 </TouchableOpacity>
             </Card.Actions>
         </Card>
@@ -435,22 +341,6 @@ const styles = StyleSheet.create({
     },
     pillBtnPrimary: { backgroundColor: "#ff5100" },
     pillBtnText: { color: "#fff", fontWeight: "600" },
-    modal: {
-        backgroundColor: "#fff",
-        marginHorizontal: 24,
-        borderRadius: 16,
-        padding: 24,
-    },
-    dropdown: {
-        borderWidth: 1,
-        borderColor: "#ddd",
-        borderRadius: 8,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        marginBottom: 16,
-    },
-    dropdownText: { fontSize: 16 },
-    dropdownPlaceholder: { fontSize: 16, color: "#aaa" },
     confirmBtn: {
         backgroundColor: "#ff5100",
         borderRadius: 10,

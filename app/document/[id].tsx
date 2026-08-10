@@ -53,7 +53,7 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 }
 
 export default function DocumentViewerScreen() {
-    const { id, filename } = useLocalSearchParams();
+    const { id, filename, fromPrepQueue } = useLocalSearchParams();
     const router = useRouter();
     const webViewRef = useRef<WebView>(null);
     const [mode, setMode] = useState<"view" | "edit">("view");
@@ -74,7 +74,14 @@ export default function DocumentViewerScreen() {
             return response.data as DocumentMeta;
         },
     });
-    const canPrintLabel = !!(docMeta?.project_number && docMeta?.position);
+    // The prep-label print action is only ever reachable from the
+    // preparation queue tab (see app/(tabs)/prep-queue.tsx) — a worker
+    // opens the BOM from there specifically to review what to prepare
+    // before printing, so it must not be offered when a document is opened
+    // any other way (search, revisions overview, etc). fromPrepQueue is set
+    // in the route params only by that screen's navigation.
+    const canPrintLabel =
+        fromPrepQueue === "1" && !!(docMeta?.project_number && docMeta?.position);
 
     // ── "Finish order" action ──
     // Only offered from inside an opened, revisioned document whose order
@@ -185,6 +192,12 @@ export default function DocumentViewerScreen() {
             setLabelPickerVisible(false);
             setSelectedEmployee(null);
             setSnackbar({ visible: true, message: t("document.labelPrinted") });
+            // This action is only reachable from the prep queue (see
+            // canPrintLabel above) — printing here is what marks the item
+            // done (order_preparation_log), so drop it from that list now
+            // rather than waiting for the user to pull-to-refresh after
+            // navigating back.
+            queryClient.invalidateQueries({ queryKey: ["prep-queue"] });
         },
         onError: (error: any) => {
             const msg = error?.response?.data?.error || error.message;
