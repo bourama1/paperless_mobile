@@ -129,5 +129,5 @@ The backend is also the one that receives the **actual production-floor
 events** (`POST /workstations/order-update` from the production system),
 prints the hardware labels, and fans updates out over Socket.IO — the
 mobile app never talks to the production system or the label printer
-directly. See the [backend repo's README](https://github.com/bourama1/paperless_backend/README.md)
+directly. See the [backend repo's README](https://github.com/bourama1/paperless_backend/blob/main/README.md)
 for the full API surface and event list.
