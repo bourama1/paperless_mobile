@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { View, StyleSheet, ActivityIndicator, Platform, TouchableOpacity } from "react-native";
+import { View, StyleSheet, ActivityIndicator, Platform, TouchableOpacity, ScrollView } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Appbar, Snackbar, Portal, Modal, Menu, Text } from "react-native-paper";
+import { Appbar, Snackbar, Portal, Modal, Menu, Text, TextInput } from "react-native-paper";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
 import { Asset } from "expo-asset";
@@ -9,7 +9,7 @@ import { readAsStringAsync, writeAsStringAsync, cacheDirectory, EncodingType } f
 import * as Sharing from "expo-sharing";
 import apiClient, { BASE_URL } from "../../src/api/client";
 import { t } from "../../src/i18n";
-import { CompletionContext, CompletionStatus } from "../../src/types";
+import { CompletionContext, CompletionStatus, CheckStatus, CycleCheck } from "../../src/types";
 
 interface Employee {
     id: number;
@@ -21,6 +21,11 @@ interface DocumentMeta {
     position: string | null;
     status: CompletionStatus | null;
     revisioned: boolean;
+    checked: boolean;
+    checked_cycles: number;
+    total_cycles: number;
+    unchecked_cycles: number[];
+    cycles: CycleCheck[];
     completion: CompletionContext | null;
 }
 
@@ -82,6 +87,11 @@ export default function DocumentViewerScreen() {
     // in the route params only by that screen's navigation.
     const canPrintLabel =
         fromPrepQueue === "1" && !!(docMeta?.project_number && docMeta?.position);
+
+    // ── "Check" (QC) action ──
+    // Unlike print-label, this is available generally whenever a document
+    // has a project/position — see the note above submitCheck.
+    const canCheck = !!(docMeta?.project_number && docMeta?.position);
 
     // ── "Finish order" action ──
     // Only offered from inside an opened, revisioned document whose order
@@ -161,6 +171,14 @@ export default function DocumentViewerScreen() {
                     projectNumber: docMeta.project_number,
                     position: docMeta.position,
                     employeeName: selectedEmployee,
+                    // How many boxes/cycles this order/position has — prints
+                    // one label page per cycle (1/N, 2/N, ...). Comes from
+                    // the same total_cycles the QC workflow uses (see
+                    // getCheckStatusForPositions on the backend), which
+                    // falls back to the pre-P2L plan's quantity when no
+                    // cycle data exists yet — exactly the case for a fresh
+                    // prep-queue item.
+                    totalCycles: docMeta.total_cycles,
                 },
                 { responseType: "arraybuffer" },
             );
@@ -205,7 +223,85 @@ export default function DocumentViewerScreen() {
         },
     });
 
-    // Clean up blob URL when leaving edit mode or unmounting
+    // ── "Check" action (QC) ──
+    // Records the third role on a cycle: who verified it's actually
+    // correct, alongside who prepared it (order_preparation_log) and who
+    // ran it (order_completion_log). Checking is per cycle (one box at a
+    // time, mirroring how one Prepare prints a separate label per box) —
+    // the picker below lists every cycle from docMeta.cycles with its
+    // current status so a worker can see at a glance which boxes still
+    // need checking and pick one. Available generally whenever a document
+    // has a project/position — there's no dedicated QC queue tab yet
+    // (unlike prep labels, which are deliberately restricted to the
+    // prep-queue flow), so this stays reachable from wherever a document is
+    // opened.
+    const [checkModalVisible, setCheckModalVisible] = useState(false);
+    const [checkEmployeeMenuVisible, setCheckEmployeeMenuVisible] = useState(false);
+    const [checkSelectedEmployee, setCheckSelectedEmployee] = useState<string | null>(null);
+    const [selectedCycleIndex, setSelectedCycleIndex] = useState<number | null>(null);
+    const [checkStatusChoice, setCheckStatusChoice] = useState<CheckStatus>("ok");
+    const [checkNote, setCheckNote] = useState("");
+
+    const { data: checkEmployees } = useQuery<Employee[]>({
+        queryKey: ["employees"],
+        queryFn: async () => {
+            const response = await apiClient.get("/employees");
+            return response.data;
+        },
+        enabled: checkModalVisible,
+    });
+
+    const openCheckModal = () => {
+        // Default to the first still-unchecked cycle so the common case
+        // (checking off boxes one by one) needs no extra taps — falls back
+        // to cycle 1 if everything's already checked (re-checking is
+        // allowed).
+        const firstUnchecked = docMeta?.cycles?.find((c) => !c.checked);
+        setSelectedCycleIndex(firstUnchecked?.cycleIndex ?? docMeta?.cycles?.[0]?.cycleIndex ?? 1);
+        setCheckModalVisible(true);
+    };
+
+    const closeCheckModal = () => {
+        setCheckModalVisible(false);
+        setCheckSelectedEmployee(null);
+        setSelectedCycleIndex(null);
+        setCheckStatusChoice("ok");
+        setCheckNote("");
+        setCheckEmployeeMenuVisible(false);
+    };
+
+    const submitCheck = useMutation({
+        mutationFn: async () => {
+            if (
+                !docMeta?.project_number ||
+                !docMeta?.position ||
+                !checkSelectedEmployee ||
+                !selectedCycleIndex
+            )
+                return;
+            await apiClient.post("/workstations/order-check", {
+                projectNumber: docMeta.project_number,
+                position: docMeta.position,
+                cycleIndex: selectedCycleIndex,
+                totalCycles: docMeta.total_cycles,
+                employeeName: checkSelectedEmployee,
+                status: checkStatusChoice,
+                note: checkNote.trim() || undefined,
+            });
+        },
+        onSuccess: () => {
+            closeCheckModal();
+            setSnackbar({ visible: true, message: t("document.checkSuccess") });
+            queryClient.invalidateQueries({ queryKey: ["document-meta", id] });
+            queryClient.invalidateQueries({ queryKey: ["documents-overview"] });
+        },
+        onError: (error: any) => {
+            const msg = error?.response?.data?.error || error.message;
+            setSnackbar({ visible: true, message: t("document.checkError", { msg }) });
+        },
+    });
+
+
     useEffect(() => {
         if (mode !== "edit" && blobUrlRef.current) {
             URL.revokeObjectURL(blobUrlRef.current);
@@ -440,7 +536,153 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
         </Portal>
     );
 
-    // ── web render ──
+    const checkModal = (
+        <Portal>
+            <Modal
+                visible={checkModalVisible}
+                onDismiss={closeCheckModal}
+                contentContainerStyle={styles.modal}>
+                <Text variant="titleLarge" style={{ marginBottom: 4 }}>
+                    {t("document.checkTitle")}
+                </Text>
+                <Text variant="bodyMedium" style={{ color: "#666", marginBottom: 12 }}>
+                    {t("document.checkHint")}
+                </Text>
+
+                <Text variant="labelLarge" style={{ marginBottom: 6, color: "#333" }}>
+                    {t("document.checkCycleLabel", {
+                        checked: docMeta?.checked_cycles ?? 0,
+                        total: docMeta?.total_cycles ?? 1,
+                    })}
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+                    <View style={styles.cycleRow}>
+                        {(docMeta?.cycles ?? []).map((cycle) => (
+                            <TouchableOpacity
+                                key={cycle.cycleIndex}
+                                style={[
+                                    styles.cyclePill,
+                                    cycle.checked && styles.cyclePillChecked,
+                                    cycle.status === "issue" && styles.cyclePillIssue,
+                                    selectedCycleIndex === cycle.cycleIndex && styles.cyclePillSelected,
+                                ]}
+                                activeOpacity={0.8}
+                                onPress={() => setSelectedCycleIndex(cycle.cycleIndex)}>
+                                <Text
+                                    style={[
+                                        styles.cyclePillText,
+                                        (cycle.checked || cycle.status === "issue") &&
+                                            styles.cyclePillTextLight,
+                                    ]}>
+                                    {cycle.cycleIndex}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </ScrollView>
+                {(() => {
+                    const selected = docMeta?.cycles?.find((c) => c.cycleIndex === selectedCycleIndex);
+                    if (!selected?.checkedAt) return null;
+                    return (
+                        <Text variant="bodySmall" style={{ color: "#666", marginBottom: 12 }}>
+                            {t(
+                                selected.status === "ok" ?
+                                    "document.checkLastOk"
+                                :   "document.checkLastIssue",
+                                { name: selected.employeeName ?? "" },
+                            )}
+                            {selected.note ? ` — ${selected.note}` : ""}
+                        </Text>
+                    );
+                })()}
+
+                <View style={styles.statusToggleRow}>
+                    <TouchableOpacity
+                        style={[
+                            styles.statusToggleBtn,
+                            checkStatusChoice === "ok" && styles.statusToggleBtnOkActive,
+                        ]}
+                        activeOpacity={0.8}
+                        onPress={() => setCheckStatusChoice("ok")}>
+                        <Text
+                            style={[
+                                styles.statusToggleText,
+                                checkStatusChoice === "ok" && styles.statusToggleTextActive,
+                            ]}>
+                            {t("document.checkStatusOk")}
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[
+                            styles.statusToggleBtn,
+                            checkStatusChoice === "issue" && styles.statusToggleBtnIssueActive,
+                        ]}
+                        activeOpacity={0.8}
+                        onPress={() => setCheckStatusChoice("issue")}>
+                        <Text
+                            style={[
+                                styles.statusToggleText,
+                                checkStatusChoice === "issue" && styles.statusToggleTextActive,
+                            ]}>
+                            {t("document.checkStatusIssue")}
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+
+                <TextInput
+                    mode="outlined"
+                    placeholder={t("document.checkNotePlaceholder")}
+                    value={checkNote}
+                    onChangeText={setCheckNote}
+                    multiline
+                    style={{ marginBottom: 16 }}
+                />
+
+                <Menu
+                    visible={checkEmployeeMenuVisible}
+                    onDismiss={() => setCheckEmployeeMenuVisible(false)}
+                    anchor={
+                        <TouchableOpacity style={styles.dropdown} onPress={() => setCheckEmployeeMenuVisible(true)}>
+                            <Text style={checkSelectedEmployee ? styles.dropdownText : styles.dropdownPlaceholder}>
+                                {checkSelectedEmployee ?? t("kiosk.selectEmployee")}
+                            </Text>
+                        </TouchableOpacity>
+                    }>
+                    {(checkEmployees ?? []).map((emp) => (
+                        <Menu.Item
+                            key={emp.id}
+                            title={emp.name}
+                            onPress={() => {
+                                setCheckSelectedEmployee(emp.name);
+                                setCheckEmployeeMenuVisible(false);
+                            }}
+                        />
+                    ))}
+                    {(checkEmployees ?? []).length === 0 && <Menu.Item title={t("kiosk.noEmployees")} disabled />}
+                </Menu>
+                <TouchableOpacity
+                    style={[
+                        styles.confirmBtn,
+                        checkStatusChoice === "issue" && styles.confirmBtnIssue,
+                        (!checkSelectedEmployee || !selectedCycleIndex || submitCheck.isPending) &&
+                            styles.confirmBtnDisabled,
+                    ]}
+                    activeOpacity={0.8}
+                    disabled={!checkSelectedEmployee || !selectedCycleIndex || submitCheck.isPending}
+                    onPress={() => submitCheck.mutate()}>
+                    {submitCheck.isPending ?
+                        <ActivityIndicator size="small" color="#fff" />
+                    :   <Text style={styles.confirmBtnText}>
+                            {selectedCycleIndex ?
+                                t("document.checkConfirmCycle", { cycle: selectedCycleIndex })
+                            :   t("document.checkConfirm")}
+                        </Text>}
+                </TouchableOpacity>
+            </Modal>
+        </Portal>
+    );
+
+
     if (Platform.OS === "web") {
         return (
             <View style={styles.container}>
@@ -457,6 +699,14 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                     )}
                     {mode === "view" && canPrintLabel && (
                         <Appbar.Action icon="printer" onPress={() => setLabelPickerVisible(true)} disabled={loading} />
+                    )}
+                    {mode === "view" && canCheck && (
+                        <Appbar.Action
+                            icon={docMeta?.checked ? "check-decagram" : "clipboard-check-outline"}
+                            color={docMeta?.checked ? "#2e7d32" : undefined}
+                            onPress={() => openCheckModal()}
+                            disabled={loading}
+                        />
                     )}
                     {mode === "view" && <Appbar.Action icon="pencil" onPress={handleEdit} disabled={loading} />}
                 </Appbar.Header>
@@ -485,6 +735,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                 </Snackbar>
                 {employeePickerModal}
                 {finishModal}
+                {checkModal}
             </View>
         );
     }
@@ -505,6 +756,14 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                 )}
                 {mode === "view" && canPrintLabel && (
                     <Appbar.Action icon="printer" onPress={() => setLabelPickerVisible(true)} disabled={loading} />
+                )}
+                {mode === "view" && canCheck && (
+                    <Appbar.Action
+                        icon={docMeta?.checked ? "check-decagram" : "clipboard-check-outline"}
+                        color={docMeta?.checked ? "#2e7d32" : undefined}
+                        onPress={() => openCheckModal()}
+                        disabled={loading}
+                    />
                 )}
                 {mode === "view" && <Appbar.Action icon="pencil" onPress={handleEdit} disabled={loading} />}
             </Appbar.Header>
@@ -549,6 +808,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
             </Snackbar>
             {employeePickerModal}
             {finishModal}
+            {checkModal}
         </View>
     );
 }
@@ -644,5 +904,35 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     confirmBtnDisabled: { backgroundColor: "#f0c4a8" },
+    confirmBtnIssue: { backgroundColor: "#c62828" },
     confirmBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+    statusToggleRow: { flexDirection: "row", gap: 10, marginBottom: 16 },
+    statusToggleBtn: {
+        flex: 1,
+        borderWidth: 1,
+        borderColor: "#ddd",
+        borderRadius: 8,
+        paddingVertical: 12,
+        alignItems: "center",
+    },
+    statusToggleBtnOkActive: { backgroundColor: "#2e7d32", borderColor: "#2e7d32" },
+    statusToggleBtnIssueActive: { backgroundColor: "#c62828", borderColor: "#c62828" },
+    statusToggleText: { fontWeight: "600", color: "#333" },
+    statusToggleTextActive: { color: "#fff" },
+    cycleRow: { flexDirection: "row", gap: 8 },
+    cyclePill: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        borderWidth: 1.5,
+        borderColor: "#ddd",
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: "#fff",
+    },
+    cyclePillChecked: { backgroundColor: "#2e7d32", borderColor: "#2e7d32" },
+    cyclePillIssue: { backgroundColor: "#c62828", borderColor: "#c62828" },
+    cyclePillSelected: { borderColor: "#ff5100", borderWidth: 3 },
+    cyclePillText: { fontWeight: "700", color: "#333" },
+    cyclePillTextLight: { color: "#fff" },
 });

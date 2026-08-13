@@ -72,6 +72,17 @@ export interface CompletionContext {
   sales_order: string | null;
 }
 
+export type CheckStatus = "ok" | "issue";
+
+export interface CycleCheck {
+  cycleIndex: number;
+  checked: boolean;
+  status: CheckStatus | null;
+  employeeName: string | null;
+  note: string | null;
+  checkedAt: string | null;
+}
+
 export interface DocumentOverviewItem {
   document_id: number;
   document_name: string;
@@ -83,6 +94,10 @@ export interface DocumentOverviewItem {
   status: CompletionStatus | null;
   revisioned: boolean;
   revisions: RevisionOverview[];
+  checked: boolean;
+  checked_cycles: number;
+  total_cycles: number;
+  unchecked_cycles: number[];
 }
 
 export interface DocumentsOverviewResponse {

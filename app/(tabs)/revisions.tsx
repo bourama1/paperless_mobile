@@ -34,6 +34,7 @@ export default function DocumentsScreen() {
     const navigation = useNavigation();
     const [statusFilters, setStatusFilters] = useState<Set<CompletionStatus>>(new Set());
     const [revisionedOnly, setRevisionedOnly] = useState(false);
+    const [uncheckedOnly, setUncheckedOnly] = useState(false);
 
     const statusParam = Array.from(statusFilters).join(",");
 
@@ -44,12 +45,13 @@ export default function DocumentsScreen() {
         refetch,
         isRefetching,
     } = useQuery<DocumentsOverviewResponse>({
-        queryKey: ["documents-overview", statusParam, revisionedOnly],
+        queryKey: ["documents-overview", statusParam, revisionedOnly, uncheckedOnly],
         queryFn: async () => {
             const response = await apiClient.get("/files", {
                 params: {
                     ...(statusParam ? { status: statusParam } : {}),
                     ...(revisionedOnly ? { revisioned: "true" } : {}),
+                    ...(uncheckedOnly ? { unchecked: "true" } : {}),
                 },
             });
             return response.data;
@@ -106,6 +108,14 @@ export default function DocumentsScreen() {
                     style={[styles.filterChip, revisionedOnly && { backgroundColor: "#ff5100" }]}
                     textStyle={revisionedOnly ? styles.filterChipTextSelected : styles.filterChipText}>
                     {t("docs.filterRevisioned")}
+                </Chip>
+                <Chip
+                    mode={uncheckedOnly ? "flat" : "outlined"}
+                    selected={uncheckedOnly}
+                    onPress={() => setUncheckedOnly((v) => !v)}
+                    style={[styles.filterChip, uncheckedOnly && { backgroundColor: "#c62828" }]}
+                    textStyle={uncheckedOnly ? styles.filterChipTextSelected : styles.filterChipText}>
+                    {t("docs.filterUnchecked")}
                 </Chip>
             </View>
             <Divider />
@@ -171,6 +181,18 @@ function DocumentCard({ item, router }: { item: DocumentOverviewItem; router: Re
                                     {t("docs.filterRevisioned")}
                                 </Chip>
                             )}
+                            <Chip
+                                mode="flat"
+                                compact
+                                style={[styles.statusChip, item.checked ? styles.checkedChip : styles.uncheckedChip]}
+                                textStyle={styles.chipText}>
+                                {item.checked ?
+                                    t("docs.checked")
+                                :   t("docs.checkedProgress", {
+                                        checked: item.checked_cycles,
+                                        total: item.total_cycles,
+                                    })}
+                            </Chip>
                             {statusMeta && (
                                 <Chip
                                     mode="flat"
@@ -183,6 +205,15 @@ function DocumentCard({ item, router }: { item: DocumentOverviewItem; router: Re
                         </View>
                     )}
                 />
+                {!item.checked && item.unchecked_cycles.length > 0 && (
+                    <Card.Content style={styles.uncheckedCyclesRow}>
+                        <Text variant="bodySmall" style={styles.uncheckedCyclesText}>
+                            {t("docs.uncheckedCycles", {
+                                cycles: item.unchecked_cycles.join(", "),
+                            })}
+                        </Text>
+                    </Card.Content>
+                )}
                 {item.revisions.length > 0 && (
                     <Card.Content>
                         <Divider style={{ marginBottom: 8 }} />
@@ -221,6 +252,10 @@ const styles = StyleSheet.create({
     chipRow: { flexDirection: "row", marginRight: 12, gap: 6 },
     revisionedChip: { backgroundColor: "#607d8b" },
     statusChip: {},
+    checkedChip: { backgroundColor: "#2e7d32" },
+    uncheckedChip: { backgroundColor: "#c62828" },
+    uncheckedCyclesRow: { paddingTop: 0, paddingBottom: 8 },
+    uncheckedCyclesText: { color: "#c62828" },
     chipText: { fontSize: 11, color: "#fff" },
     revisionRow: {
         flexDirection: "row",
