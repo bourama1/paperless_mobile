@@ -61,7 +61,11 @@ export interface RevisionOverview {
   is_edited: boolean;
 }
 
-export type CompletionStatus = "complete" | "missing_product" | "shipped_incomplete";
+export type CompletionStatus =
+  | "complete"
+  | "complete_with_changes"
+  | "missing_product"
+  | "shipped_incomplete";
 
 export interface CompletionContext {
   order_id: string;

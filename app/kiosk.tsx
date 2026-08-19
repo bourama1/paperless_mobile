@@ -28,11 +28,12 @@ interface Employee {
     name: string;
 }
 
-type CompletionStatus = "complete" | "missing_product" | "shipped_incomplete";
+type CompletionStatus = "complete" | "complete_with_changes" | "missing_product" | "shipped_incomplete";
 type KioskMode = "completion" | "status";
 
 const STATUS_OPTIONS: { value: CompletionStatus; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
     { value: "complete", label: "kiosk.statusComplete", icon: "checkmark-circle" },
+    { value: "complete_with_changes", label: "kiosk.statusCompleteWithChanges", icon: "sync-outline" },
     { value: "missing_product", label: "kiosk.statusMissing", icon: "time" },
     { value: "shipped_incomplete", label: "kiosk.statusIncomplete", icon: "alert-circle" },
 ];
@@ -190,6 +191,7 @@ function CompletionKiosk({
     workstation: string;
     onChangeWorkstation: () => void;
 }) {
+    const router = useRouter();
     const [pending, setPending] = useState<OrderUpdatePayload[]>([]);
     const [employeeMenuVisible, setEmployeeMenuVisible] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
@@ -259,6 +261,39 @@ function CompletionKiosk({
         },
     });
 
+    // Lets the operator open the order's document one last time from inside
+    // the finishing modal, for a final edit/check before confirming — e.g.
+    // fixing something they noticed while picking the completion status.
+    // Uses the same import-pbom lookup the prep queue uses; navigating away
+    // (router.push) keeps this screen mounted underneath, so the pending
+    // queue and any employee/status selection already made aren't lost —
+    // router.back() from the document viewer returns right to this modal.
+    const openDocument = useMutation({
+        mutationFn: async () => {
+            if (!current) return;
+            const response = await apiClient.post("/workstations/import-pbom", {
+                projectNumber: current.order.projectNumber,
+                position: current.order.position,
+                workplace: current.order.workplace,
+            });
+            return response.data;
+        },
+        onSuccess: (doc: any) => {
+            if (!doc) return;
+            const latest = doc.revisions?.[0];
+            router.push({
+                pathname: `/document/${doc.id}`,
+                params: {
+                    filename: latest?.filename || doc.name || "",
+                    version: latest?.version || 1,
+                },
+            });
+        },
+        onError: () => {
+            setSnackbar({ visible: true, message: t("kiosk.openDocumentError") });
+        },
+    });
+
     return (
         <View style={styles.container}>
             <View style={styles.idleHeader}>
@@ -302,6 +337,17 @@ function CompletionKiosk({
                             <Text variant="bodyMedium" style={styles.orderMeta}>
                                 {current.order.customerDesc} — {current.order.productDesc}
                             </Text>
+
+                            <TouchableOpacity
+                                style={styles.openDocBtn}
+                                activeOpacity={0.7}
+                                disabled={openDocument.isPending}
+                                onPress={() => openDocument.mutate()}>
+                                {openDocument.isPending ?
+                                    <ActivityIndicator size="small" color="#ff5100" />
+                                :   <Ionicons name="document-text-outline" size={18} color="#ff5100" />}
+                                <Text style={styles.openDocBtnText}>{t("kiosk.openDocument")}</Text>
+                            </TouchableOpacity>
 
                             <Divider style={{ marginVertical: 16 }} />
 
@@ -613,6 +659,19 @@ const styles = StyleSheet.create({
         maxHeight: "85%",
     },
     orderMeta: { color: "#666", marginTop: 2 },
+    openDocBtn: {
+        flexDirection: "row",
+        alignItems: "center",
+        alignSelf: "flex-start",
+        borderWidth: 1,
+        borderColor: "#ff5100",
+        borderRadius: 8,
+        paddingVertical: 8,
+        paddingHorizontal: 14,
+        marginTop: 12,
+        gap: 8,
+    },
+    openDocBtnText: { color: "#ff5100", fontWeight: "600" },
     sectionLabel: { color: "#909090", marginBottom: 8 },
     dropdown: {
         flexDirection: "row",

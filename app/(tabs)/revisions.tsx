@@ -19,12 +19,14 @@ function formatTime(iso: string): string {
 
 const STATUS_FILTERS: { value: CompletionStatus; label: string; color: string }[] = [
     { value: "complete", label: "docs.filterComplete", color: "#2e7d32" },
+    { value: "complete_with_changes", label: "docs.filterCompleteWithChanges", color: "#00838f" },
     { value: "missing_product", label: "docs.filterMissing", color: "#f9a825" },
     { value: "shipped_incomplete", label: "docs.filterIncomplete", color: "#c62828" },
 ];
 
 const STATUS_META: Record<CompletionStatus, { label: string; color: string }> = {
     complete: { label: "docs.statusComplete", color: "#2e7d32" },
+    complete_with_changes: { label: "docs.statusCompleteWithChanges", color: "#00838f" },
     missing_product: { label: "docs.statusMissing", color: "#f9a825" },
     shipped_incomplete: { label: "docs.statusIncomplete", color: "#c62828" },
 };
