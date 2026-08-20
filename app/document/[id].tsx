@@ -85,13 +85,16 @@ export default function DocumentViewerScreen() {
     // before printing, so it must not be offered when a document is opened
     // any other way (search, revisions overview, etc). fromPrepQueue is set
     // in the route params only by that screen's navigation.
-    const canPrintLabel =
-        fromPrepQueue === "1" && !!(docMeta?.project_number && docMeta?.position);
+    const canPrintLabel = fromPrepQueue === "1" && !!(docMeta?.project_number && docMeta?.position);
 
     // ── "Check" (QC) action ──
-    // Unlike print-label, this is available generally whenever a document
-    // has a project/position — see the note above submitCheck.
-    const canCheck = !!(docMeta?.project_number && docMeta?.position);
+    // Only offered once the order has actually reached one of the kiosk
+    // finishing states (complete, complete_with_changes, missing_product,
+    // shipped_incomplete) — before that there's nothing to check yet, so
+    // showing "unchecked" or a Check button would be misleading rather
+    // than useful. docMeta.status is null until the kiosk records a
+    // completion for this project/position (see completionService.ts).
+    const canCheck = !!(docMeta?.project_number && docMeta?.position && docMeta?.status);
 
     // ── "Finish order" action ──
     // Only offered from inside an opened, revisioned document whose order
@@ -272,13 +275,7 @@ export default function DocumentViewerScreen() {
 
     const submitCheck = useMutation({
         mutationFn: async () => {
-            if (
-                !docMeta?.project_number ||
-                !docMeta?.position ||
-                !checkSelectedEmployee ||
-                !selectedCycleIndex
-            )
-                return;
+            if (!docMeta?.project_number || !docMeta?.position || !checkSelectedEmployee || !selectedCycleIndex) return;
             await apiClient.post("/workstations/order-check", {
                 projectNumber: docMeta.project_number,
                 position: docMeta.position,
@@ -300,7 +297,6 @@ export default function DocumentViewerScreen() {
             setSnackbar({ visible: true, message: t("document.checkError", { msg }) });
         },
     });
-
 
     useEffect(() => {
         if (mode !== "edit" && blobUrlRef.current) {
@@ -388,7 +384,10 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                     });
                     setSnackbar({ visible: true, message: t("document.saved") });
                 } catch (err: any) {
-                    setSnackbar({ visible: true, message: err?.response?.data?.error || err?.message || t("document.editorError") });
+                    setSnackbar({
+                        visible: true,
+                        message: err?.response?.data?.error || err?.message || t("document.editorError"),
+                    });
                     return;
                 }
             }
@@ -418,7 +417,10 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                             });
                             setSnackbar({ visible: true, message: t("document.saved") });
                         } catch (err: any) {
-                            setSnackbar({ visible: true, message: err?.response?.data?.error || err?.message || t("document.editorError") });
+                            setSnackbar({
+                                visible: true,
+                                message: err?.response?.data?.error || err?.message || t("document.editorError"),
+                            });
                             return;
                         }
                     }
@@ -474,7 +476,10 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                     {(employees ?? []).length === 0 && <Menu.Item title={t("kiosk.noEmployees")} disabled />}
                 </Menu>
                 <TouchableOpacity
-                    style={[styles.confirmBtn, (!selectedEmployee || printLabel.isPending) && styles.confirmBtnDisabled]}
+                    style={[
+                        styles.confirmBtn,
+                        (!selectedEmployee || printLabel.isPending) && styles.confirmBtnDisabled,
+                    ]}
                     activeOpacity={0.8}
                     disabled={!selectedEmployee || printLabel.isPending}
                     onPress={() => printLabel.mutate()}>
@@ -538,10 +543,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
 
     const checkModal = (
         <Portal>
-            <Modal
-                visible={checkModalVisible}
-                onDismiss={closeCheckModal}
-                contentContainerStyle={styles.modal}>
+            <Modal visible={checkModalVisible} onDismiss={closeCheckModal} contentContainerStyle={styles.modal}>
                 <Text variant="titleLarge" style={{ marginBottom: 4 }}>
                     {t("document.checkTitle")}
                 </Text>
@@ -571,8 +573,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                                 <Text
                                     style={[
                                         styles.cyclePillText,
-                                        (cycle.checked || cycle.status === "issue") &&
-                                            styles.cyclePillTextLight,
+                                        (cycle.checked || cycle.status === "issue") && styles.cyclePillTextLight,
                                     ]}>
                                     {cycle.cycleIndex}
                                 </Text>
@@ -585,12 +586,9 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                     if (!selected?.checkedAt) return null;
                     return (
                         <Text variant="bodySmall" style={{ color: "#666", marginBottom: 12 }}>
-                            {t(
-                                selected.status === "ok" ?
-                                    "document.checkLastOk"
-                                :   "document.checkLastIssue",
-                                { name: selected.employeeName ?? "" },
-                            )}
+                            {t(selected.status === "ok" ? "document.checkLastOk" : "document.checkLastIssue", {
+                                name: selected.employeeName ?? "",
+                            })}
                             {selected.note ? ` — ${selected.note}` : ""}
                         </Text>
                     );
@@ -598,10 +596,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
 
                 <View style={styles.statusToggleRow}>
                     <TouchableOpacity
-                        style={[
-                            styles.statusToggleBtn,
-                            checkStatusChoice === "ok" && styles.statusToggleBtnOkActive,
-                        ]}
+                        style={[styles.statusToggleBtn, checkStatusChoice === "ok" && styles.statusToggleBtnOkActive]}
                         activeOpacity={0.8}
                         onPress={() => setCheckStatusChoice("ok")}>
                         <Text
@@ -676,12 +671,12 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                             {selectedCycleIndex ?
                                 t("document.checkConfirmCycle", { cycle: selectedCycleIndex })
                             :   t("document.checkConfirm")}
-                        </Text>}
+                        </Text>
+                    }
                 </TouchableOpacity>
             </Modal>
         </Portal>
     );
-
 
     if (Platform.OS === "web") {
         return (
