@@ -7,7 +7,7 @@ import { WebView, WebViewMessageEvent } from "react-native-webview";
 import { Asset } from "expo-asset";
 import { readAsStringAsync, writeAsStringAsync, cacheDirectory, EncodingType } from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
-import apiClient, { BASE_URL } from "../../src/api/client";
+import apiClient, { BASE_URL, API_KEY } from "../../src/api/client";
 import { t } from "../../src/i18n";
 import { CompletionContext, CompletionStatus, CheckStatus, CycleCheck } from "../../src/types";
 
@@ -314,7 +314,11 @@ export default function DocumentViewerScreen() {
         };
     }, []);
 
-    const pdfUrl = `${BASE_URL}/workstations/documents/${id}/render?t=${refreshKey}`;
+    // A WebView (native) / <iframe> (web) loads this URL directly and can't
+    // attach a custom X-API-Key header, so the shared key is passed as a
+    // query param instead — the one exception the backend's apiKeyAuth
+    // middleware allows, and it's redacted from server logs.
+    const pdfUrl = `${BASE_URL}/workstations/documents/${id}/render?t=${refreshKey}&apiKey=${encodeURIComponent(API_KEY ?? "")}`;
 
     // ── handle "edit" press ──
     const handleEdit = useCallback(async () => {
