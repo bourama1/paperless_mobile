@@ -29,7 +29,18 @@
             "favicon": "./assets/favicon.png",
             "output": "single"
         },
-        "plugins": ["expo-router", "expo-asset", "expo-font"],
+        "plugins": [
+            "expo-router",
+            "expo-asset",
+            "expo-font",
+            [
+                "./plugins/withBackendCertPinning",
+                {
+                    "certPath": "./certs/backend-ca.pem",
+                    "hostnames": ["10.110.10.6"]
+                }
+            ]
+        ],
         "extra": {
             "router": {},
             "eas": {
