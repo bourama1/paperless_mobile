@@ -2,31 +2,41 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Run Mobile (Expo)",
+            "label": "Mobile: Prebuild Android (apply plugins)",
             "type": "shell",
-            "command": "npx expo start",
-            "group": { "kind": "build", "isDefault": true },
-            "problemMatcher": [],
-            "detail": "Start Expo dev server for mobile app"
-        },
-        {
-            "label": "Test",
-            "type": "shell",
-            "command": "npm test",
-            "group": {
-                "kind": "test",
-                "isDefault": true
+            "command": "npx expo prebuild --platform android --clean",
+            "options": {
+                "cwd": "${workspaceFolder}\\paperless_mobile"
             },
-            "problemMatcher": [],
-            "detail": "Run all Jest tests"
-        },
-        {
-            "label": "Build Mobile APK",
-            "type": "shell",
-            "command": "cd android && ./gradlew clean assembleRelease",
             "group": "build",
             "problemMatcher": [],
-            "detail": "Build production release APK via Gradle (assembleRelease)"
+            "detail": "Regenerates the android/ folder from app.json + plugins/. MUST run before any Gradle build — otherwise Gradle silently builds whatever was in android/ last time, which may predate the cert-pinning/release-signing plugins or an updated certs/backend-ca.pem. Requires RELEASE_KEYSTORE_PATH, RELEASE_KEYSTORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD to be set as environment variables for a real release-signed output (see certs/README.md and plugins/withReleaseSigning.js) — without them this still succeeds but falls back to debug signing."
+        },
+        {
+            "label": "Mobile: Build Release AAB (Play Store)",
+            "type": "shell",
+            "command": "cd android && ./gradlew clean bundleRelease",
+            "options": {
+                "cwd": "${workspaceFolder}\\paperless_mobile"
+            },
+            "group": "build",
+            "dependsOn": ["Mobile: Prebuild Android (apply plugins)"],
+            "dependsOrder": "sequence",
+            "problemMatcher": [],
+            "detail": "Builds the Android App Bundle (.aab) at android/app/build/outputs/bundle/release/app-release.aab for Play Console upload. Always runs prebuild first (see dependsOn) so it can't silently build from a stale android/ folder. NOTE: bundleRelease, not assembleRelease — Play Console requires an .aab for new apps, not a raw .apk."
+        },
+        {
+            "label": "Mobile: Build Sideload APK (local testing only — NOT for Play Store)",
+            "type": "shell",
+            "command": "cd android && ./gradlew clean assembleRelease",
+            "options": {
+                "cwd": "${workspaceFolder}\\paperless_mobile"
+            },
+            "group": "build",
+            "dependsOn": ["Mobile: Prebuild Android (apply plugins)"],
+            "dependsOrder": "sequence",
+            "problemMatcher": [],
+            "detail": "Builds a plain .apk for directly installing on one tablet to test (adb install / file transfer), bypassing Play Store entirely. Fine for quick local testing even without release-signing env vars set (Android allows installing a debug-signed APK directly — only Play Console rejects it). Do NOT upload this file to Play Console."
         }
     ]
 }
