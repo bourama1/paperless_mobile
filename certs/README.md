@@ -34,6 +34,33 @@ Before running `eas build --profile production`:
 Only the public certificate goes here — never copy the server's private key
 (`.key` file) into the mobile project.
 
+## "SDK location not found" after a clean prebuild
+
+If a Gradle build suddenly fails with `SDK location not found` right after
+running `expo prebuild --clean`, that's why: a full clean regenerates
+`android/` from scratch, which deletes `android/local.properties` — the
+file that normally stores your Android SDK path. The routine
+"Mobile: Prebuild Android (apply plugins)" VS Code task deliberately avoids
+`--clean` for exactly this reason (see its description) — but the fix that
+actually makes this stop being fragile is to set `ANDROID_HOME` as a
+**permanent Windows environment variable**, so Gradle can always find the
+SDK regardless of what happens to `local.properties`:
+
+1. Find your SDK path — typically
+   `C:\Users\<you>\AppData\Local\Android\Sdk` if installed via Android
+   Studio (Android Studio → Settings → Languages & Frameworks → Android
+   SDK shows the exact path).
+2. Set it permanently: System Properties → Environment Variables → New
+   (User variable) → Name `ANDROID_HOME`, Value that path. Or via terminal:
+   `setx ANDROID_HOME "C:\Users\you\AppData\Local\Android\Sdk"`.
+3. **Close and reopen VS Code / your terminal** — `setx` only affects new
+   sessions, not ones already open.
+
+Once `ANDROID_HOME` is set, even a full `--clean` prebuild (the
+"Mobile: Full Clean Rebuild" task) won't break the next build — Gradle
+falls back to `ANDROID_HOME` when `local.properties` is missing.
+
+
 ## Release signing (separate from the cert above)
 
 If you're building locally via the VS Code tasks (`./gradlew bundleRelease`)

@@ -30,7 +30,8 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env files (contains the shared API key — never commit this)
+.env
 .env*.local
 
 # typescript
@@ -39,5 +40,3 @@ yarn-error.*
 # generated native folders
 /ios
 /android
-
-.env

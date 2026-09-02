@@ -141,5 +141,13 @@
     "prepQueue.openBomError": "Nepodařilo se otevřít BOM: {msg}",
     "prepQueue.refreshFoundNew": "Načteno {count} nových položek.",
     "prepQueue.refreshNothingNew": "Žádný nový plán k dispozici.",
-    "prepQueue.refreshError": "Nepodařilo se zkontrolovat nový plán."
+    "prepQueue.refreshError": "Nepodařilo se zkontrolovat nový plán.",
+    "connectivity.title": "Server je nedostupný",
+    "connectivity.subtitle": "Zkontrolujte připojení k síti a zkuste to znovu.",
+    "connectivity.retry": "Zkusit znovu",
+    "connectivity.retrying": "Zkouším se znovu připojit…",
+    "connectivity.autoRetryHint": "Aplikace se automaticky pokouší o obnovení připojení.",
+    "language.label": "Jazyk",
+    "language.czech": "Čeština",
+    "language.english": "Angličtina"
 }

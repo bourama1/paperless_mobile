@@ -9,6 +9,7 @@ import apiClient from "../src/api/client";
 import socket from "../src/services/socket";
 import { Workstation, WorkstationOrder } from "../src/types";
 import { t } from "../src/i18n";
+import LanguageSwitcher from "../src/components/LanguageSwitcher";
 
 // Sentinel value used when Completion mode should accept FINISHED events for any
 // workplace without showing or storing a human-visible workplace label.
@@ -307,6 +308,7 @@ function CompletionKiosk({
                         {connected ? t("kiosk.connected") : t("kiosk.disconnected")}
                     </Text>
                 </View>
+                <LanguageSwitcher />
             </View>
 
             <View style={styles.idleBody}>
@@ -533,6 +535,7 @@ function StatusKiosk({ workstation, onChangeWorkstation }: { workstation: string
                         {connected ? t("kiosk.connected") : t("kiosk.disconnected")}
                     </Text>
                 </View>
+                <LanguageSwitcher />
             </View>
 
             <View style={styles.statusBody}>

@@ -1,6 +1,7 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { t } from "../../src/i18n";
+import LanguageSwitcher from "../../src/components/LanguageSwitcher";
 
 export default function TabLayout() {
     return (
@@ -15,6 +16,7 @@ export default function TabLayout() {
                 headerStyle: { backgroundColor: "#fff" },
                 headerTintColor: "#ff5100",
                 headerTitleStyle: { fontWeight: "bold" },
+                headerRight: () => <LanguageSwitcher />,
             }}>
             <Tabs.Screen
                 name="index"

@@ -4,13 +4,24 @@
         {
             "label": "Mobile: Prebuild Android (apply plugins)",
             "type": "shell",
+            "command": "npx expo prebuild --platform android",
+            "options": {
+                "cwd": "${workspaceFolder}\\paperless_mobile"
+            },
+            "group": "build",
+            "problemMatcher": [],
+            "detail": "Re-applies app.json + plugins/ onto the existing android/ folder (cert pinning, release signing). Deliberately NOT --clean for routine use: a full clean wipes android/local.properties (your Android SDK path) every time, which breaks the next Gradle build unless ANDROID_HOME is set as a permanent environment variable (see certs/README.md — do this once, it's the real fix). Non-clean prebuild is idempotent and safe to re-run before every build; use 'Mobile: Full Clean Rebuild' instead if something seems stuck or a plugin change isn't taking effect."
+        },
+        {
+            "label": "Mobile: Full Clean Rebuild (troubleshooting only)",
+            "type": "shell",
             "command": "npx expo prebuild --platform android --clean",
             "options": {
                 "cwd": "${workspaceFolder}\\paperless_mobile"
             },
             "group": "build",
             "problemMatcher": [],
-            "detail": "Regenerates the android/ folder from app.json + plugins/. MUST run before any Gradle build — otherwise Gradle silently builds whatever was in android/ last time, which may predate the cert-pinning/release-signing plugins or an updated certs/backend-ca.pem. Requires RELEASE_KEYSTORE_PATH, RELEASE_KEYSTORE_PASSWORD, RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD to be set as environment variables for a real release-signed output (see certs/README.md and plugins/withReleaseSigning.js) — without them this still succeeds but falls back to debug signing."
+            "detail": "Deletes and fully regenerates android/ from scratch — including android/local.properties (your Android SDK path). The next Gradle build will fail with 'SDK location not found' unless ANDROID_HOME is set as a permanent environment variable first (see certs/README.md). Only use this when troubleshooting, e.g. after adding a new native dependency or if a plugin change isn't showing up — not as a routine step before every build."
         },
         {
             "label": "Mobile: Build Release AAB (Play Store)",
@@ -37,6 +48,30 @@
             "dependsOrder": "sequence",
             "problemMatcher": [],
             "detail": "Builds a plain .apk for directly installing on one tablet to test (adb install / file transfer), bypassing Play Store entirely. Fine for quick local testing even without release-signing env vars set (Android allows installing a debug-signed APK directly — only Play Console rejects it). Do NOT upload this file to Play Console."
+        },
+        {
+            "label": "Mobile: Export Web Build",
+            "type": "shell",
+            "command": "npx expo export --platform web",
+            "options": {
+                "cwd": "${workspaceFolder}\\paperless_mobile"
+            },
+            "group": "build",
+            "problemMatcher": [],
+            "detail": "Builds the browser version of this same app into paperless_mobile/dist/ (index.html + JS bundle + assets). This alone doesn't do anything useful on its own — the backend needs a copy of it to actually serve it. Use 'Mobile: Build & Deploy Web Frontend to Backend' instead unless you specifically just want to inspect the dist/ output."
+        },
+        {
+            "label": "Mobile: Build & Deploy Web Frontend to Backend",
+            "type": "shell",
+            "command": "Remove-Item -Recurse -Force -ErrorAction SilentlyContinue '..\\paperless_backend\\web-dist'; Copy-Item -Recurse -Force 'dist' '..\\paperless_backend\\web-dist'",
+            "options": {
+                "cwd": "${workspaceFolder}\\paperless_mobile"
+            },
+            "group": "build",
+            "dependsOn": ["Mobile: Export Web Build"],
+            "dependsOrder": "sequence",
+            "problemMatcher": [],
+            "detail": "Runs the web export (see dependsOn), then clears out any previous web-dist in the sibling paperless_backend project and copies the fresh build over — assumes paperless_mobile and paperless_backend sit side by side under the same parent folder, matching how the Android build tasks above already reach into paperless_mobile. Run this BEFORE the backend's own 'Build EXE' task, which packages whatever is currently sitting in paperless_backend/web-dist into the deployed .exe/.zip — this task only stages the files, it doesn't trigger a backend build itself."
         }
     ]
 }
