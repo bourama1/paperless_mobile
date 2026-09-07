@@ -16,7 +16,16 @@ function resolveBaseUrl(): string {
     if (Platform.OS === "web" && typeof window !== "undefined" && window.location?.origin) {
         return window.location.origin;
     }
-    return debuggerHost ? `http://${ip}:5300` : `http://${__DEV__ ? "localhost" : "10.110.10.6"}:5300`;
+
+    // Same switch plugins/withBackendCertPinning.js reads at prebuild time
+    // to decide whether cleartext HTTP is explicitly permitted for the
+    // backend's hostname — keep both in sync, or the app will either try
+    // https before a certificate exists, or send plain http once Android
+    // starts blocking cleartext for the domain. See that plugin's header
+    // comment for the full two-phase deploy story.
+    const useHttps = process.env.EXPO_PUBLIC_BACKEND_USE_HTTPS === "true";
+    const scheme = useHttps ? "https" : "http";
+    return debuggerHost ? `http://${ip}:5300` : `${scheme}://${__DEV__ ? "localhost" : "10.110.10.6"}:5300`;
 }
 
 export const BASE_URL = resolveBaseUrl();

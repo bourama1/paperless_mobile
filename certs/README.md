@@ -17,22 +17,65 @@ Before running `eas build --profile production`:
 
 1. On the backend server, generate (or locate) the real certificate — see
    the backend README's TLS section, e.g.:
+
    ```bash
    openssl req -x509 -newkey rsa:2048 -nodes \
      -keyout server.key -out server.crt -days 825 \
      -subj "/CN=<your-server-LAN-IP>"
    ```
+
 2. Copy that server's `.crt` (the public certificate — never the `.key`
    file) here, replacing this file:
+
    ```bash
    cp /path/to/server.crt mobile/certs/backend-ca.pem
    ```
+
 3. If the server's IP/hostname is anything other than `10.110.10.6`, update
    the `hostnames` option for the plugin in `app.json` to match.
 4. Rebuild: `eas build --profile production --platform android`.
 
 Only the public certificate goes here — never copy the server's private key
 (`.key` file) into the mobile project.
+
+## Deploying before you have a certificate at all
+
+You don't need a certificate to deploy — you can ship over plain HTTP now
+and switch to HTTPS later, as a deliberate two-phase rollout, using a
+single switch: `EXPO_PUBLIC_BACKEND_USE_HTTPS` in `mobile/.env`.
+
+**Why this needs a real switch, not just "leave the cert out":** Android
+9+ (this app targets SDK 36) blocks plain HTTP by default. Without
+explicitly telling Android's network security policy to allow it for the
+backend's hostname, the app doesn't just skip cert-checking — it refuses
+to connect at all, failing with `CLEARTEXT communication ... not
+permitted`. `EXPO_PUBLIC_BACKEND_USE_HTTPS` is read by both
+`src/config/env.ts` (picks the URL scheme the app connects with) and
+`plugins/withBackendCertPinning.js` (decides whether to explicitly permit
+cleartext for that hostname), so they can't drift out of sync.
+
+**Phase 1 — no certificate yet:**
+
+1. Leave `EXPO_PUBLIC_BACKEND_USE_HTTPS` unset (or `false`) in `mobile/.env`.
+2. Leave the backend's `SSL_CERT_PATH`/`SSL_KEY_PATH` unset too — it
+   automatically falls back to plain HTTP (see backend README).
+3. Build and deploy normally. The placeholder cert in this folder is never
+   used in this phase — nothing needs updating here yet.
+
+**Phase 2 — once you have a real certificate:**
+
+1. Generate the backend's TLS certificate (see the top of this file) and
+   copy `server.crt` into `certs/backend-ca.pem`, replacing the placeholder.
+2. Set the backend's `SSL_CERT_PATH`/`SSL_KEY_PATH` and redeploy it.
+3. Set `EXPO_PUBLIC_BACKEND_USE_HTTPS=true` in `mobile/.env`.
+4. Rebuild the mobile app from scratch — prebuild, then the release
+   build — and redistribute it. This is a real rebuild, not a config
+   change on an already-installed app: the scheme and cleartext policy are
+   both baked in at build time.
+
+Prebuild logs which mode it picked, so you can confirm before building:
+`[withBackendCertPinning] EXPO_PUBLIC_BACKEND_USE_HTTPS is not "true" — building for plain HTTP ...`
+means phase 1; silence from that plugin means phase 2 (HTTPS, cert pinned).
 
 ## "SDK location not found" after a clean prebuild
 
@@ -59,7 +102,6 @@ SDK regardless of what happens to `local.properties`:
 Once `ANDROID_HOME` is set, even a full `--clean` prebuild (the
 "Mobile: Full Clean Rebuild" task) won't break the next build — Gradle
 falls back to `ANDROID_HOME` when `local.properties` is missing.
-
 
 ## Release signing (separate from the cert above)
 
@@ -93,4 +135,3 @@ so every prebuild picks them up automatically. Without them, prebuild still
 succeeds but silently falls back to debug signing — check for a
 `[withReleaseSigning]` warning in the task output to confirm which path it
 took.
-

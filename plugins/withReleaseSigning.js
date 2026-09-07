@@ -108,15 +108,30 @@ function withReleaseSigningGradle(config) {
     });
 }
 
+let hasWarned = false;
+
 module.exports = function withReleaseSigning(config) {
     const env = readReleaseSigningEnv();
 
     if (!env) {
-        console.warn(
-            "[withReleaseSigning] RELEASE_KEYSTORE_PATH/RELEASE_KEYSTORE_PASSWORD/RELEASE_KEY_ALIAS/RELEASE_KEY_PASSWORD " +
-                "are not all set — skipping release signing setup. The release build type will fall back to the debug " +
-                "keystore, which Google Play will reject. Set these before running prebuild for a real production build.",
-        );
+        // This plugin's function body runs every time Expo resolves the
+        // config — for `expo export --platform web`, `expo start`, etc.,
+        // not just an actual Android prebuild. The gradle changes below
+        // are genuinely Android-only and simply never apply outside a
+        // native Android build, but without this note the warning reads
+        // as if something's wrong with whatever command you just ran.
+        // De-duped to print once per process instead of once per platform
+        // pass Expo happens to make internally.
+        if (!hasWarned) {
+            hasWarned = true;
+            console.warn(
+                "[withReleaseSigning] RELEASE_KEYSTORE_PATH/RELEASE_KEYSTORE_PASSWORD/RELEASE_KEY_ALIAS/RELEASE_KEY_PASSWORD " +
+                    "are not all set. This only affects Android native release builds (gradlew/EAS Android builds) — " +
+                    "irrelevant if you're exporting for web or iOS, or just running the dev server. For an Android " +
+                    "release build, the release type will fall back to the debug keystore, which Google Play " +
+                    "rejects — set these four variables before running prebuild for a real production build.",
+            );
+        }
         return config;
     }
 
