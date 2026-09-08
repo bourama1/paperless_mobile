@@ -15,6 +15,13 @@ import LanguageSwitcher from "../src/components/LanguageSwitcher";
 // workplace without showing or storing a human-visible workplace label.
 const ANY_WORKPLACE = "__ANY__";
 
+// Workplaces whose orders MUST trigger the finishing screen — but only on a
+// tablet that is already set up as a completion kiosk (mode === "completion").
+// When an order finishes at one of these, the kiosk force-switches to that
+// workplace and pops the modal, even if it was showing another workplace's
+// completion kiosk. Status kiosks and the mode picker are never hijacked.
+const FORCED_FINISH_WORKPLACES = new Set(["Hardware", "Motor"]);
+
 interface OrderUpdatePayload {
     order: WorkstationOrder;
     cycleIndex: number;
@@ -43,6 +50,11 @@ export default function KioskScreen() {
     const router = useRouter();
     const [mode, setMode] = useState<KioskMode | null>(null);
     const [selection, setSelection] = useState<string | null>(null);
+
+    // FINISHED events for FORCED_FINISH_WORKPLACES land here (via the listener
+    // below) so they survive the mode/selection switch and reach the
+    // CompletionKiosk even though it mounts after the event was emitted.
+    const [forcedFinishes, setForcedFinishes] = useState<OrderUpdatePayload[]>([]);
 
     // Completion mode filters FINISHED events, which only ever carry
     // order.workplace (a work-TYPE string like "Hardware") — never a
@@ -88,6 +100,31 @@ export default function KioskScreen() {
         setMode(null);
         setSelection(null);
     }, []);
+
+    // Force the finishing screen for the final workplaces — but only on a
+    // tablet that is already set up as a completion kiosk. A status kiosk
+    // (or the mode picker) is never hijacked: it stays on its own screen.
+    // modeRef lets the socket listener read the current mode at event time
+    // without re-registering on every mode change.
+    const modeRef = useRef(mode);
+    modeRef.current = mode;
+
+    useEffect(() => {
+        const onOrderUpdate = (update: OrderUpdatePayload) => {
+            if (update.action !== "FINISHED") return;
+            if (!FORCED_FINISH_WORKPLACES.has(update.order.workplace)) return;
+            if (modeRef.current !== "completion") return;
+            setMode("completion");
+            setSelection(ANY_WORKPLACE);
+            setForcedFinishes((prev) => [...prev, update]);
+        };
+        socket.on("workstation-order-update", onOrderUpdate);
+        return () => {
+            socket.off("workstation-order-update", onOrderUpdate);
+        };
+    }, []);
+
+    const drainForcedFinishes = useCallback(() => setForcedFinishes([]), []);
 
     // ── 1. mode picker ───────────────────────────────────────────────────────
     if (!mode) {
@@ -174,7 +211,12 @@ export default function KioskScreen() {
 
     // ── 3. the actual kiosk ──────────────────────────────────────────────────
     return mode === "completion" ?
-            <CompletionKiosk workstation={selection} onChangeWorkstation={reset} />
+            <CompletionKiosk
+                workstation={selection}
+                forcedFinishes={forcedFinishes}
+                onForcedFinishesDrained={drainForcedFinishes}
+                onChangeWorkstation={reset}
+            />
         :   <StatusKiosk workstation={selection} onChangeWorkstation={reset} />;
 }
 
@@ -187,9 +229,13 @@ export default function KioskScreen() {
 
 function CompletionKiosk({
     workstation,
+    forcedFinishes,
+    onForcedFinishesDrained,
     onChangeWorkstation,
 }: {
     workstation: string;
+    forcedFinishes: OrderUpdatePayload[];
+    onForcedFinishesDrained: () => void;
     onChangeWorkstation: () => void;
 }) {
     const router = useRouter();
@@ -227,6 +273,10 @@ function CompletionKiosk({
     useEffect(() => {
         const onOrderUpdate = (update: OrderUpdatePayload) => {
             if (update.action !== "FINISHED") return;
+            // Hardware/Motor finishes are owned by KioskScreen's forced queue
+            // (see FORCED_FINISH_WORKPLACES) — handling them here too would
+            // double-add them to the pending queue.
+            if (FORCED_FINISH_WORKPLACES.has(update.order.workplace)) return;
             if (workstationRef.current !== ANY_WORKPLACE && update.order.workplace !== workstationRef.current) return;
             setPending((prev) => [...prev, update]);
         };
@@ -235,6 +285,16 @@ function CompletionKiosk({
             socket.off("workstation-order-update", onOrderUpdate);
         };
     }, []);
+
+    // Drain forced finishes queued by KioskScreen into our pending queue.
+    // They arrive after this kiosk mounts, so they can't go through the
+    // socket listener above. The queue is cleared once merged so a later
+    // remount of this kiosk doesn't re-show stale finishes.
+    useEffect(() => {
+        if (forcedFinishes.length === 0) return;
+        setPending((prev) => [...prev, ...forcedFinishes]);
+        onForcedFinishesDrained();
+    }, [forcedFinishes, onForcedFinishesDrained]);
 
     const submitCompletion = useMutation({
         mutationFn: async () => {

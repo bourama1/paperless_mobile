@@ -48,16 +48,45 @@ function readReleaseSigningEnv() {
     return values;
 }
 
+/**
+ * Escapes a value for writing into a .properties file. Gradle reads
+ * gradle.properties using Java's Properties parser, which treats backslash
+ * as an escape character — an unrecognized escape sequence (e.g. `\s` from
+ * a Windows path like `D:\secure\...`) gets silently dropped, backslash
+ * and all, corrupting the value. @expo/config-plugins' own writer does NOT
+ * apply this escaping when it serializes property values (confirmed by
+ * reading its source — propertiesListToString does a plain
+ * `${key}=${value}` with no escaping at all), so a raw Windows path looks
+ * completely correct if you open gradle.properties in a text editor, and
+ * is silently wrong the moment Gradle actually parses it. This is what
+ * needs to compensate for that mismatch.
+ */
+function escapePropertiesValue(value) {
+    return value.replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n");
+}
+
 /** Writes the keystore path/passwords into android/gradle.properties, which
  * Gradle auto-exposes as bare project properties (e.g. MYAPP_RELEASE_STORE_FILE)
  * usable directly in build.gradle without any extra plumbing. */
 function withReleaseGradleProperties(config, env) {
     return withGradleProperties(config, (config) => {
         const props = [
-            { type: "property", key: "MYAPP_RELEASE_STORE_FILE", value: env.RELEASE_KEYSTORE_PATH },
-            { type: "property", key: "MYAPP_RELEASE_STORE_PASSWORD", value: env.RELEASE_KEYSTORE_PASSWORD },
-            { type: "property", key: "MYAPP_RELEASE_KEY_ALIAS", value: env.RELEASE_KEY_ALIAS },
-            { type: "property", key: "MYAPP_RELEASE_KEY_PASSWORD", value: env.RELEASE_KEY_PASSWORD },
+            {
+                type: "property",
+                key: "MYAPP_RELEASE_STORE_FILE",
+                value: escapePropertiesValue(env.RELEASE_KEYSTORE_PATH),
+            },
+            {
+                type: "property",
+                key: "MYAPP_RELEASE_STORE_PASSWORD",
+                value: escapePropertiesValue(env.RELEASE_KEYSTORE_PASSWORD),
+            },
+            { type: "property", key: "MYAPP_RELEASE_KEY_ALIAS", value: escapePropertiesValue(env.RELEASE_KEY_ALIAS) },
+            {
+                type: "property",
+                key: "MYAPP_RELEASE_KEY_PASSWORD",
+                value: escapePropertiesValue(env.RELEASE_KEY_PASSWORD),
+            },
         ];
         config.modResults = config.modResults.filter(
             (item) => !(item.type === "property" && props.some((p) => p.key === item.key)),
@@ -139,3 +168,8 @@ module.exports = function withReleaseSigning(config) {
     config = withReleaseSigningGradle(config);
     return config;
 };
+
+// Exported alongside the default export (safe — Expo's plugin loader just
+// calls this module as a function and ignores extra properties on it) so
+// it can be tested directly without needing a real prebuild/Gradle run.
+module.exports.escapePropertiesValue = escapePropertiesValue;
