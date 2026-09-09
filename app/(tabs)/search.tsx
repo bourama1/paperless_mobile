@@ -11,6 +11,7 @@ interface SearchResult {
     customer_code: number;
     order_code: number;
     position_code: number;
+    locked?: boolean;
 }
 
 interface PbomTypeOption {
@@ -166,23 +167,37 @@ export default function SearchScreen() {
                             onPress={() => fetchTypes.mutate(item)}
                             disabled={fetchTypes.isPending || importPbom.isPending}
                             activeOpacity={0.7}>
-                            <Card style={[styles.card, { borderColor: "#ff5100" }]} mode="outlined">
+                            <Card
+                                style={[
+                                    styles.card,
+                                    item.locked ? styles.cardLocked : { borderColor: "#ff5100" },
+                                ]}
+                                mode="outlined">
                                 <Card.Title
                                     title={t("search.resultOrder", { code: item.order_code })}
-                                    titleStyle={styles.cardTitle}
+                                    titleStyle={[styles.cardTitle, item.locked && styles.cardTitleLocked]}
                                     subtitle={t("search.resultPosition", { code: item.position_code })}
-                                    right={(props) =>
+                                    right={() =>
                                         fetchTypes.isPending && fetchTypes.variables === item ?
                                             <ActivityIndicator size="small" style={{ marginRight: 12 }} />
-                                        :   <Ionicons
-                                                name="chevron-forward"
-                                                size={20}
-                                                color="#ccc"
-                                                style={{ marginRight: 12 }}
-                                            />
-
+                                        :   <View style={{ flexDirection: "row", alignItems: "center", marginRight: 12, gap: 8 }}>
+                                                {item.locked && (
+                                                    <Ionicons name="lock-closed" size={18} color="#c62828" />
+                                                )}
+                                                <Ionicons name="chevron-forward" size={20} color="#ccc" />
+                                            </View>
                                     }
                                 />
+                                {item.locked && (
+                                    <Card.Content style={{ paddingTop: 0 }}>
+                                        <View style={styles.lockedBanner}>
+                                            <Ionicons name="lock-closed" size={14} color="#c62828" />
+                                            <Text variant="bodySmall" style={styles.lockedBannerText}>
+                                                {t("prepQueue.locked")}
+                                            </Text>
+                                        </View>
+                                    </Card.Content>
+                                )}
                             </Card>
                         </TouchableOpacity>
                     )}
@@ -294,7 +309,26 @@ const styles = StyleSheet.create({
     },
     list: { padding: 12 },
     card: { marginBottom: 12 },
+    cardLocked: {
+        borderColor: "#ef9a9a",
+        backgroundColor: "#fff8f8",
+    },
     cardTitle: { fontWeight: "bold" },
+    cardTitleLocked: { color: "#c62828" },
+    lockedBanner: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        backgroundColor: "#ffebee",
+        borderRadius: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        marginBottom: 8,
+    },
+    lockedBannerText: {
+        color: "#c62828",
+        fontWeight: "bold",
+    },
     modal: {
         backgroundColor: "#fff",
         marginHorizontal: 20,

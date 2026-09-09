@@ -149,5 +149,7 @@
     "connectivity.autoRetryHint": "Aplikace se automaticky pokouší o obnovení připojení.",
     "language.label": "Jazyk",
     "language.czech": "Čeština",
-    "language.english": "Angličtina"
+    "language.english": "Angličtina",
+    "prepQueue.locked": "Objednávka je zamčena pro tisk",
+    "prepQueue.lockedHint": "Tato objednávka byla zamčena v Masterplanu (tisk_zamcen=1) a nelze ji připravit."
 }

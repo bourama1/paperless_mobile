@@ -17,6 +17,7 @@ interface PrepQueueItem {
     production_time: number | null;
     planned_date: string | null;
     plan_label: string | null;
+    locked?: boolean;
 }
 
 function formatDate(iso: string): string {
@@ -223,7 +224,7 @@ export default function PrepQueueScreen() {
                         <PrepQueueCard
                             item={item}
                             isOpening={openBom.isPending && openBom.variables?.id === item.id}
-                            disabled={openBom.isPending}
+                            disabled={openBom.isPending || item.locked === true}
                             onPrepare={() => openBom.mutate(item)}
                         />
                     )}
@@ -254,20 +255,36 @@ function PrepQueueCard({
     disabled: boolean;
     onPrepare: () => void;
 }) {
+    const isLocked = item.locked === true;
     return (
-        <Card style={styles.card} mode="outlined">
+        <Card
+            style={[styles.card, isLocked && styles.cardLocked]}
+            mode="outlined">
             <Card.Title
                 title={`${item.project_number} / ${item.position}`}
-                titleStyle={styles.cardTitle}
+                titleStyle={[styles.cardTitle, isLocked && styles.cardTitleLocked]}
                 subtitle={item.sales_order ? `${t("prepQueue.salesOrder")} ${item.sales_order}` : undefined}
                 right={() => (
-                    <Chip mode="flat" compact style={styles.workplaceChip} textStyle={styles.chipText}>
-                        {item.workplace}
-                    </Chip>
+                    <View style={{ flexDirection: "row", alignItems: "center", marginRight: 12, gap: 6 }}>
+                        {isLocked && (
+                            <Ionicons name="lock-closed" size={18} color="#c62828" />
+                        )}
+                        <Chip mode="flat" compact style={isLocked ? styles.workplaceChipLocked : styles.workplaceChip} textStyle={styles.chipText}>
+                            {item.workplace}
+                        </Chip>
+                    </View>
                 )}
             />
             <Card.Content>
                 <Divider style={{ marginBottom: 8 }} />
+                {isLocked && (
+                    <View style={styles.lockedBanner}>
+                        <Ionicons name="lock-closed" size={14} color="#c62828" />
+                        <Text variant="bodySmall" style={styles.lockedBannerText}>
+                            {t("prepQueue.locked")}
+                        </Text>
+                    </View>
+                )}
                 <View style={styles.metaRow}>
                     <Text variant="bodySmall" style={styles.metaLabel}>
                         {t("prepQueue.quantity")}
@@ -293,12 +310,22 @@ function PrepQueueCard({
             </Card.Content>
             <Card.Actions>
                 <TouchableOpacity
-                    style={[styles.confirmBtn, styles.cardConfirmBtn, disabled && styles.confirmBtnDisabled]}
+                    style={[
+                        styles.confirmBtn,
+                        styles.cardConfirmBtn,
+                        (disabled || isLocked) && styles.confirmBtnDisabled,
+                        isLocked && styles.confirmBtnLocked,
+                    ]}
                     activeOpacity={0.8}
-                    disabled={disabled}
+                    disabled={disabled || isLocked}
                     onPress={onPrepare}>
                     {isOpening ?
                         <ActivityIndicator size="small" color="#fff" />
+                    : isLocked ?
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                            <Ionicons name="lock-closed" size={14} color="#fff" />
+                            <Text style={styles.confirmBtnText}>{t("prepQueue.locked")}</Text>
+                        </View>
                     :   <Text style={styles.confirmBtnText}>{t("prepQueue.openBom")}</Text>}
                 </TouchableOpacity>
             </Card.Actions>
@@ -322,9 +349,29 @@ const styles = StyleSheet.create({
     filterChipTextSelected: { color: "#fff" },
     list: { padding: 12 },
     card: { marginBottom: 12 },
+    cardLocked: {
+        borderColor: "#ef9a9a",
+        backgroundColor: "#fff8f8",
+    },
     cardTitle: { fontWeight: "bold" },
-    workplaceChip: { backgroundColor: "#607d8b", marginRight: 12 },
+    cardTitleLocked: { color: "#c62828" },
+    workplaceChip: { backgroundColor: "#607d8b" },
+    workplaceChipLocked: { backgroundColor: "#c62828" },
     chipText: { fontSize: 11, color: "#fff" },
+    lockedBanner: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        backgroundColor: "#ffebee",
+        borderRadius: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        marginBottom: 8,
+    },
+    lockedBannerText: {
+        color: "#c62828",
+        fontWeight: "bold",
+    },
     metaRow: {
         flexDirection: "row",
         justifyContent: "space-between",
@@ -349,5 +396,6 @@ const styles = StyleSheet.create({
     },
     cardConfirmBtn: { flex: 1, paddingVertical: 10 },
     confirmBtnDisabled: { backgroundColor: "#f0c4a8" },
+    confirmBtnLocked: { backgroundColor: "#c62828" },
     confirmBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
 });

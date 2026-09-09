@@ -149,5 +149,7 @@
     "connectivity.autoRetryHint": "The app is automatically trying to restore the connection.",
     "language.label": "Language",
     "language.czech": "Czech",
-    "language.english": "English"
+    "language.english": "English",
+    "prepQueue.locked": "Order is locked for printing",
+    "prepQueue.lockedHint": "This order has been locked in Masterplan (tisk_zamcen=1) and cannot be prepared."
 }
