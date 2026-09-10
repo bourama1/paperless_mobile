@@ -48,7 +48,7 @@
     "kiosk.disconnected": "Odpojeno",
     "kiosk.waiting": "Čeká se na dokončení zakázky…",
     "kiosk.orderFinished": "Zakázka dokončena",
-    "kiosk.orderMeta": "Zakázka {productOrder} / pozice {position} — cyklus {cycle}/{total}",
+    "kiosk.orderMeta": "Výr. obj. {productOrder} / pozice {position} — cyklus {cycle}/{total}",
     "kiosk.whoFinished": "Kdo dokončil tuto zakázku?",
     "kiosk.selectEmployee": "Vyberte jméno",
     "kiosk.noEmployees": "Žádní zaměstnanci nejsou k dispozici",
@@ -135,7 +135,7 @@
     "prepQueue.quantity": "Množství",
     "prepQueue.plannedDate": "Plánované datum",
     "prepQueue.label": "Štítek",
-    "prepQueue.salesOrder": "Zakázka",
+    "prepQueue.salesOrder": "Prod. obj.",
     "prepQueue.prepare": "Připravit",
     "prepQueue.openBom": "Zobrazit BOM",
     "prepQueue.openBomError": "Nepodařilo se otevřít BOM: {msg}",
@@ -151,5 +151,7 @@
     "language.czech": "Čeština",
     "language.english": "Angličtina",
     "prepQueue.locked": "Objednávka je zamčena pro tisk",
-    "prepQueue.lockedHint": "Tato objednávka byla zamčena v Masterplanu (tisk_zamcen=1) a nelze ji připravit."
+    "prepQueue.lockedHint": "Tato objednávka byla zamčena v Masterplanu (tisk_zamcen=1) a nelze ji připravit.",
+    "workstations.label.salesOrder": "Prod. obj.:",
+    "workstations.label.productOrder": "Výr. obj.:"
 }

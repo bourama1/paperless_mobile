@@ -610,9 +610,14 @@ function StatusKiosk({ workstation, onChangeWorkstation }: { workstation: string
                         disabled={openOrder.isPending}
                         onPress={() => openOrder.mutate()}>
                         <View style={styles.statusCardHeader}>
-                            <Text variant="titleLarge" style={{ fontWeight: "bold" }}>
-                                {current.current_order_data.productOrder}
-                            </Text>
+                            <View>
+                                <Text variant="bodySmall" style={styles.label}>
+                                    {t("workstations.label.productOrder")}
+                                </Text>
+                                <Text variant="titleLarge" style={{ fontWeight: "bold" }}>
+                                    {current.current_order_data.productOrder}
+                                </Text>
+                            </View>
                             {openOrder.isPending ?
                                 <ActivityIndicator size="small" />
                             :   <Ionicons name="open-outline" size={26} color="#ff5100" />}

@@ -25,7 +25,12 @@ function resolveBaseUrl(): string {
     // comment for the full two-phase deploy story.
     const useHttps = process.env.EXPO_PUBLIC_BACKEND_USE_HTTPS === "true";
     const scheme = useHttps ? "https" : "http";
-    return debuggerHost ? `http://${ip}:5300` : `${scheme}://${__DEV__ ? "localhost" : "10.110.10.6"}:5300`;
+    // Use the configured hostname when on HTTPS (must match the TLS cert's CN).
+    // Fall back to the hardcoded IP for plain HTTP / dev builds.
+    const host = useHttps
+        ? (process.env.EXPO_PUBLIC_BACKEND_HOST || "tocz-app4.toors.cz")
+        : (__DEV__ ? "localhost" : "10.110.10.6");
+    return debuggerHost ? `http://${ip}:5300` : `${scheme}://${host}:5300`;
 }
 
 export const BASE_URL = resolveBaseUrl();

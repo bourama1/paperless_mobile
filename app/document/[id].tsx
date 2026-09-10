@@ -174,17 +174,23 @@ export default function DocumentViewerScreen() {
                     projectNumber: docMeta.project_number,
                     position: docMeta.position,
                     employeeName: selectedEmployee,
-                    // How many boxes/cycles this order/position has — prints
-                    // one label page per cycle (1/N, 2/N, ...). Comes from
-                    // the same total_cycles the QC workflow uses (see
-                    // getCheckStatusForPositions on the backend), which
-                    // falls back to the pre-P2L plan's quantity when no
-                    // cycle data exists yet — exactly the case for a fresh
-                    // prep-queue item.
                     totalCycles: docMeta.total_cycles,
                 },
                 { responseType: "arraybuffer" },
             );
+
+            // If the backend printed directly to the Godex, it returns
+            // {"success":true} — nothing more to do on the mobile side.
+            // If PREP_LABEL_PRINTER_HOST is not configured on the server it
+            // falls back to returning the raw PDF bytes so the worker can still
+            // send it somewhere manually (share sheet / dev testing).
+            const contentType = response.headers["content-type"] || "";
+            if (contentType.includes("application/json")) {
+                // Printer configured on backend — already printed, done.
+                return;
+            }
+
+            // Fallback: PDF bytes returned — open share sheet.
             const filename = `label_${docMeta.project_number}_${docMeta.position}.pdf`;
 
             if (Platform.OS === "web") {

@@ -174,7 +174,11 @@ function DocumentCard({ item, router }: { item: DocumentOverviewItem; router: Re
                     title={item.document_name}
                     titleStyle={styles.cardTitle}
                     subtitle={
-                        item.project_number && item.position ? `${item.project_number} / ${item.position}` : undefined
+                        item.project_number && item.position
+                            ? `${t("workstations.label.project")} ${item.project_number}  ·  ${t("workstations.label.position")} ${item.position}`
+                            : item.project_number
+                              ? `${t("workstations.label.project")} ${item.project_number}`
+                              : undefined
                     }
                     right={() => (
                         <View style={styles.chipRow}>

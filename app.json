@@ -33,13 +33,6 @@
             "expo-router",
             "expo-asset",
             "expo-font",
-            [
-                "./plugins/withBackendCertPinning",
-                {
-                    "certPath": "./certs/backend-ca.pem",
-                    "hostnames": ["10.110.10.6"]
-                }
-            ],
             "./plugins/withReleaseSigning"
         ],
         "extra": {

@@ -66,6 +66,7 @@ export default function SearchScreen() {
                     filename: rev?.filename || "",
                     version: rev?.version || 1,
                     annotations: rev?.annotations || "",
+                    fromPrepQueue: "1",
                 },
             });
         },

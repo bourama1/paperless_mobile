@@ -177,7 +177,7 @@ export default function WorkstationsScreen() {
                                         {item.current_order_data.salesOrder ?
                                             <View style={styles.detailRow}>
                                                 <Text variant="bodySmall" style={styles.label}>
-                                                    {t("workstations.label.order")}
+                                                    {t("workstations.label.salesOrder")}
                                                 </Text>
                                                 <Text variant="bodySmall" style={styles.value} numberOfLines={1}>
                                                     {item.current_order_data.salesOrder}

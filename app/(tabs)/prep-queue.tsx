@@ -261,9 +261,15 @@ function PrepQueueCard({
             style={[styles.card, isLocked && styles.cardLocked]}
             mode="outlined">
             <Card.Title
-                title={`${item.project_number} / ${item.position}`}
+                title={`${t("workstations.label.position")} ${item.position}`}
                 titleStyle={[styles.cardTitle, isLocked && styles.cardTitleLocked]}
-                subtitle={item.sales_order ? `${t("prepQueue.salesOrder")} ${item.sales_order}` : undefined}
+                subtitle={
+                    <>
+                        {item.project_number ? `${t("workstations.label.project")} ${item.project_number}` : ""}
+                        {item.project_number && item.sales_order ? "  ·  " : ""}
+                        {item.sales_order ? `${t("prepQueue.salesOrder")} ${item.sales_order}` : ""}
+                    </>
+                }
                 right={() => (
                     <View style={{ flexDirection: "row", alignItems: "center", marginRight: 12, gap: 6 }}>
                         {isLocked && (

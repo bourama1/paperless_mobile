@@ -1,8 +1,15 @@
 /**
  * withBackendCertPinning.js
  *
- * Bundles the backend's (self-signed) TLS certificate into the Android
- * build and wires up a network security config that trusts it — scoped
+ * NOTE: This plugin is NOT currently registered in app.json and is not used
+ * in production. The backend now has a publicly trusted Sectigo certificate
+ * (tocz-app4.toors.cz), which Android and all browsers trust out of the box
+ * — no cert bundling is needed. This file is kept as a reference in case the
+ * setup ever needs to fall back to a self-signed certificate.
+ *
+ * Original purpose: bundled the backend's self-signed TLS certificate into
+ * the Android build and wired up a network security config to trust it,
+ * scoped only to the backend's hostname.
  * only to the backend's own host(s), not app-wide. This is what makes the
  * app actually trust the server's HTTPS certificate on every tablet
  * automatically, without anyone having to manually install the cert as a

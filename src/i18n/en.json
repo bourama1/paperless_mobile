@@ -48,7 +48,7 @@
     "kiosk.disconnected": "Disconnected",
     "kiosk.waiting": "Waiting for the order to finish…",
     "kiosk.orderFinished": "Order finished",
-    "kiosk.orderMeta": "Order {productOrder} / position {position} — cycle {cycle}/{total}",
+    "kiosk.orderMeta": "Prod. order {productOrder} / position {position} — cycle {cycle}/{total}",
     "kiosk.whoFinished": "Who finished this order?",
     "kiosk.selectEmployee": "Select a name",
     "kiosk.noEmployees": "No employees are available",
@@ -135,7 +135,7 @@
     "prepQueue.quantity": "Quantity",
     "prepQueue.plannedDate": "Planned date",
     "prepQueue.label": "Label",
-    "prepQueue.salesOrder": "Order",
+    "prepQueue.salesOrder": "Sales order",
     "prepQueue.prepare": "Prepare",
     "prepQueue.openBom": "View BOM",
     "prepQueue.openBomError": "Failed to open BOM: {msg}",
@@ -151,5 +151,7 @@
     "language.czech": "Czech",
     "language.english": "English",
     "prepQueue.locked": "Order is locked for printing",
-    "prepQueue.lockedHint": "This order has been locked in Masterplan (tisk_zamcen=1) and cannot be prepared."
+    "prepQueue.lockedHint": "This order has been locked in Masterplan (tisk_zamcen=1) and cannot be prepared.",
+    "workstations.label.salesOrder": "Sales order:",
+    "workstations.label.productOrder": "Prod. order:"
 }
