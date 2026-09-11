@@ -169,10 +169,7 @@ export default function SearchScreen() {
                             disabled={fetchTypes.isPending || importPbom.isPending}
                             activeOpacity={0.7}>
                             <Card
-                                style={[
-                                    styles.card,
-                                    item.locked ? styles.cardLocked : { borderColor: "#ff5100" },
-                                ]}
+                                style={[styles.card, item.locked ? styles.cardLocked : { borderColor: "#ff5100" }]}
                                 mode="outlined">
                                 <Card.Title
                                     title={t("search.resultOrder", { code: item.order_code })}
@@ -181,7 +178,13 @@ export default function SearchScreen() {
                                     right={() =>
                                         fetchTypes.isPending && fetchTypes.variables === item ?
                                             <ActivityIndicator size="small" style={{ marginRight: 12 }} />
-                                        :   <View style={{ flexDirection: "row", alignItems: "center", marginRight: 12, gap: 8 }}>
+                                        :   <View
+                                                style={{
+                                                    flexDirection: "row",
+                                                    alignItems: "center",
+                                                    marginRight: 12,
+                                                    gap: 8,
+                                                }}>
                                                 {item.locked && (
                                                     <Ionicons name="lock-closed" size={18} color="#c62828" />
                                                 )}

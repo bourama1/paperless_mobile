@@ -153,5 +153,8 @@
     "prepQueue.locked": "Objednávka je zamčena pro tisk",
     "prepQueue.lockedHint": "Tato objednávka byla zamčena v Masterplanu (tisk_zamcen=1) a nelze ji připravit.",
     "workstations.label.salesOrder": "Prod. obj.:",
-    "workstations.label.productOrder": "Výr. obj.:"
+    "workstations.label.productOrder": "Výr. obj.:",
+    "kiosk.toorsSuccess": "Výrobní zakázka úspěšně uzavřena v ERP",
+    "kiosk.toorsError": "Uzavření v ERP selhalo: {error}",
+    "kiosk.toorsNotFound": "Výrobní zakázka nenalezena v ERP (č. {order})"
 }

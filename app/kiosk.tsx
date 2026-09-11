@@ -299,7 +299,7 @@ function CompletionKiosk({
     const submitCompletion = useMutation({
         mutationFn: async () => {
             if (!current || !selectedEmployee || !selectedStatus) return;
-            await apiClient.post("/workstations/order-completion", {
+            const res = await apiClient.post("/workstations/order-completion", {
                 orderId: current.order._id,
                 workstation: current.order.workplace,
                 cycleIndex: current.cycleIndex,
@@ -310,12 +310,34 @@ function CompletionKiosk({
                 salesOrder: current.order.salesOrder,
                 employeeName: selectedEmployee,
                 status: selectedStatus,
+                // Quantity for ERP closing: Motor orders can finish multiple
+                // units at once (order.quantity > 1). Hardware and others
+                // are always 1 per completion call.
+                quantity: current.order.quantity ?? 1,
             });
+            return res.data;
         },
-        onSuccess: () => {
+        onSuccess: (data) => {
             setPending((prev) => prev.slice(1));
             setSelectedEmployee(null);
             setSelectedStatus(null);
+
+            // Show ERP close result if the backend attempted it
+            if (data?.toors) {
+                if (data.toors.success) {
+                    setSnackbar({ visible: true, message: t("kiosk.toorsSuccess") });
+                } else if (data.toors.status === 404) {
+                    setSnackbar({
+                        visible: true,
+                        message: t("kiosk.toorsNotFound", { order: data.toors.error ?? "" }),
+                    });
+                } else if (data.toors.error) {
+                    setSnackbar({
+                        visible: true,
+                        message: t("kiosk.toorsError", { error: data.toors.error }),
+                    });
+                }
+            }
         },
         onError: () => {
             setSnackbar({ visible: true, message: t("kiosk.submitError") });

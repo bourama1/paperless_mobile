@@ -153,5 +153,8 @@
     "prepQueue.locked": "Order is locked for printing",
     "prepQueue.lockedHint": "This order has been locked in Masterplan (tisk_zamcen=1) and cannot be prepared.",
     "workstations.label.salesOrder": "Sales order:",
-    "workstations.label.productOrder": "Prod. order:"
+    "workstations.label.productOrder": "Prod. order:",
+    "kiosk.toorsSuccess": "Production order successfully closed in ERP",
+    "kiosk.toorsError": "ERP close failed: {error}",
+    "kiosk.toorsNotFound": "Production order not found in ERP (no. {order})"
 }

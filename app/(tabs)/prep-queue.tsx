@@ -18,6 +18,8 @@ interface PrepQueueItem {
     planned_date: string | null;
     plan_label: string | null;
     locked?: boolean;
+    product_order: string | null;
+    hardware_type: string | null;
 }
 
 function formatDate(iso: string): string {
@@ -40,6 +42,7 @@ export default function PrepQueueScreen() {
     const queryClient = useQueryClient();
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
     const [selectedWorkplaces, setSelectedWorkplaces] = useState<Set<string>>(new Set());
+    const [selectedHardwareTypes, setSelectedHardwareTypes] = useState<Set<string>>(new Set());
     const [snackbar, setSnackbar] = useState({ visible: false, message: "" });
 
     const {
@@ -108,19 +111,37 @@ export default function PrepQueueScreen() {
         return Array.from(new Set(items.map((i) => i.workplace))).sort();
     }, [items]);
 
+    const hardwareTypeOptions = useMemo(() => {
+        return Array.from(
+            new Set(items.map((i) => i.hardware_type).filter((ht): ht is string => !!ht)),
+        ).sort();
+    }, [items]);
+
     const filteredItems = useMemo(() => {
         return items.filter((item) => {
             if (selectedDate && (!item.planned_date || dateKey(item.planned_date) !== selectedDate)) return false;
             if (selectedWorkplaces.size > 0 && !selectedWorkplaces.has(item.workplace)) return false;
+            if (selectedHardwareTypes.size > 0) {
+                if (!item.hardware_type || !selectedHardwareTypes.has(item.hardware_type)) return false;
+            }
             return true;
         });
-    }, [items, selectedDate, selectedWorkplaces]);
+    }, [items, selectedDate, selectedWorkplaces, selectedHardwareTypes]);
 
     const toggleWorkplace = (wp: string) => {
         setSelectedWorkplaces((prev) => {
             const next = new Set(prev);
             if (next.has(wp)) next.delete(wp);
             else next.add(wp);
+            return next;
+        });
+    };
+
+    const toggleHardwareType = (type: string) => {
+        setSelectedHardwareTypes((prev) => {
+            const next = new Set(prev);
+            if (next.has(type)) next.delete(type);
+            else next.add(type);
             return next;
         });
     };
@@ -193,6 +214,28 @@ export default function PrepQueueScreen() {
                                 selectedWorkplaces.has(wp) ? styles.filterChipTextSelected : styles.filterChipText
                             }>
                             {wp}
+                        </Chip>
+                    ))}
+                </View>
+            )}
+            {hardwareTypeOptions.length > 0 && (
+                <View style={styles.filterRow}>
+                    {hardwareTypeOptions.map((type) => (
+                        <Chip
+                            key={type}
+                            mode={selectedHardwareTypes.has(type) ? "flat" : "outlined"}
+                            onPress={() => toggleHardwareType(type)}
+                            selected={selectedHardwareTypes.has(type)}
+                            style={[
+                                styles.filterChip,
+                                selectedHardwareTypes.has(type) && styles.filterChipActive,
+                            ]}
+                            textStyle={
+                                selectedHardwareTypes.has(type) ?
+                                    styles.filterChipTextSelected
+                                :   styles.filterChipText
+                            }>
+                            {type}
                         </Chip>
                     ))}
                 </View>
@@ -275,6 +318,11 @@ function PrepQueueCard({
                         {isLocked && (
                             <Ionicons name="lock-closed" size={18} color="#c62828" />
                         )}
+                        {item.hardware_type && (
+                            <Chip mode="flat" compact style={styles.hardwareTypeChip} textStyle={styles.chipText}>
+                                {item.hardware_type}
+                            </Chip>
+                        )}
                         <Chip mode="flat" compact style={isLocked ? styles.workplaceChipLocked : styles.workplaceChip} textStyle={styles.chipText}>
                             {item.workplace}
                         </Chip>
@@ -311,6 +359,14 @@ function PrepQueueCard({
                             {t("prepQueue.label")}
                         </Text>
                         <Text variant="bodySmall">{item.plan_label}</Text>
+                    </View>
+                )}
+                {item.product_order && (
+                    <View style={styles.metaRow}>
+                        <Text variant="bodySmall" style={styles.metaLabel}>
+                            {t("workstations.label.productOrder")}
+                        </Text>
+                        <Text variant="bodySmall">{item.product_order}</Text>
                     </View>
                 )}
             </Card.Content>
@@ -363,6 +419,7 @@ const styles = StyleSheet.create({
     cardTitleLocked: { color: "#c62828" },
     workplaceChip: { backgroundColor: "#607d8b" },
     workplaceChipLocked: { backgroundColor: "#c62828" },
+    hardwareTypeChip: { backgroundColor: "#00695c" },
     chipText: { fontSize: 11, color: "#fff" },
     lockedBanner: {
         flexDirection: "row",
