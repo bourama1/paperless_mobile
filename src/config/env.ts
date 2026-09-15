@@ -17,12 +17,6 @@ function resolveBaseUrl(): string {
         return window.location.origin;
     }
 
-    // Same switch plugins/withBackendCertPinning.js reads at prebuild time
-    // to decide whether cleartext HTTP is explicitly permitted for the
-    // backend's hostname — keep both in sync, or the app will either try
-    // https before a certificate exists, or send plain http once Android
-    // starts blocking cleartext for the domain. See that plugin's header
-    // comment for the full two-phase deploy story.
     const useHttps = process.env.EXPO_PUBLIC_BACKEND_USE_HTTPS === "true";
     const scheme = useHttps ? "https" : "http";
     // Use the configured hostname when on HTTPS (must match the TLS cert's CN).
