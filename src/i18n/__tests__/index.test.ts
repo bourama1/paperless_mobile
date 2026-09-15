@@ -27,6 +27,12 @@ describe("i18n", () => {
         expect(i18n.t("workstations.title")).toBe("Workstations");
     });
 
+    it("t() switches to Ukrainian", async () => {
+        await i18n.setLanguage("uk");
+        expect(i18n.getLanguage()).toBe("uk");
+        expect(i18n.t("workstations.title")).toBe("Робочі місця");
+    });
+
     it("setLanguage persists the choice to AsyncStorage", async () => {
         await i18n.setLanguage("en");
         expect(await AsyncStorage.getItem("paperless_mobile_language")).toBe("en");
@@ -74,10 +80,12 @@ describe("i18n", () => {
         expect(listener).not.toHaveBeenCalled();
     });
 
-    it("interpolates params the same way in both languages", async () => {
+    it("interpolates params the same way in every language", async () => {
         expect(i18n.t("search.resultOrder", { code: "12345" })).toBe("Zakázka 12345");
         await i18n.setLanguage("en");
         expect(i18n.t("search.resultOrder", { code: "12345" })).toBe("Order 12345");
+        await i18n.setLanguage("uk");
+        expect(i18n.t("search.resultOrder", { code: "12345" })).toBe("Замовлення 12345");
     });
 
     it("falls back to the key itself for a completely unknown key with no defaultValue", () => {

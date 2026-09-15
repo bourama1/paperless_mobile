@@ -1,13 +1,16 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import cs from "./cs.json";
 import en from "./en.json";
+import uk from "./uk.json";
 
-export type Language = "cs" | "en";
+export type Language = "cs" | "en" | "uk";
+
+export const LANGUAGES: Language[] = ["cs", "en", "uk"];
 
 const DEFAULT_LANGUAGE: Language = "cs";
 const STORAGE_KEY = "paperless_mobile_language";
 
-const dictionaries: Record<Language, Record<string, string>> = { cs, en };
+const dictionaries: Record<Language, Record<string, string>> = { cs, en, uk };
 
 let currentLanguage: Language = DEFAULT_LANGUAGE;
 const listeners = new Set<() => void>();
@@ -53,8 +56,8 @@ export async function setLanguage(lang: Language): Promise<void> {
 export async function loadPersistedLanguage(): Promise<Language> {
     try {
         const stored = await AsyncStorage.getItem(STORAGE_KEY);
-        if (stored === "cs" || stored === "en") {
-            currentLanguage = stored;
+        if (LANGUAGES.includes(stored as Language)) {
+            currentLanguage = stored as Language;
             notify();
         }
     } catch (e) {
