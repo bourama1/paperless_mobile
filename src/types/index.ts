@@ -1,3 +1,8 @@
+export interface Employee {
+  id: number;
+  name: string;
+}
+
 export interface Revision {
   id: number;
   document_id: number;

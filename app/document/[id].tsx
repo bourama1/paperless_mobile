@@ -1,20 +1,18 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import { View, StyleSheet, ActivityIndicator, Platform, TouchableOpacity, ScrollView } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Appbar, Snackbar, Portal, Modal, Menu, Text, TextInput } from "react-native-paper";
+import { Appbar, Snackbar, Portal, Modal, Text, TextInput } from "react-native-paper";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
+import { Ionicons } from "@expo/vector-icons";
 import { Asset } from "expo-asset";
 import { readAsStringAsync, writeAsStringAsync, cacheDirectory, EncodingType } from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import apiClient, { BASE_URL, API_KEY } from "../../src/api/client";
 import { t } from "../../src/i18n";
 import { CompletionContext, CompletionStatus, CheckStatus, CycleCheck } from "../../src/types";
-
-interface Employee {
-    id: number;
-    name: string;
-}
+import { useEmployees } from "../../src/hooks/useEmployees";
+import EmployeePicker from "../../src/components/EmployeePicker";
 
 interface DocumentMeta {
     project_number: string | null;
@@ -32,11 +30,6 @@ interface DocumentMeta {
 // Statuses that represent an order closed out without actually being
 // finished — the "Finish order" action only applies to these.
 const UNFINISHED_STATUSES: CompletionStatus[] = ["missing_product", "shipped_incomplete"];
-
-interface Employee {
-    id: number;
-    name: string;
-}
 
 // Self-contained base64 encoder — avoids depending on btoa being polyfilled
 // in the RN/Hermes runtime, which isn't guaranteed.
@@ -110,17 +103,8 @@ export default function DocumentViewerScreen() {
 
     const queryClient = useQueryClient();
     const [finishModalVisible, setFinishModalVisible] = useState(false);
-    const [finishEmployeeMenuVisible, setFinishEmployeeMenuVisible] = useState(false);
     const [finishSelectedEmployee, setFinishSelectedEmployee] = useState<string | null>(null);
-
-    const { data: finishEmployees } = useQuery<Employee[]>({
-        queryKey: ["employees"],
-        queryFn: async () => {
-            const response = await apiClient.get("/employees");
-            return response.data;
-        },
-        enabled: finishModalVisible,
-    });
+    const { data: finishEmployees } = useEmployees(finishModalVisible);
 
     const finishOrder = useMutation({
         mutationFn: async () => {
@@ -153,17 +137,8 @@ export default function DocumentViewerScreen() {
     });
 
     const [labelPickerVisible, setLabelPickerVisible] = useState(false);
-    const [employeeMenuVisible, setEmployeeMenuVisible] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
-
-    const { data: employees } = useQuery<Employee[]>({
-        queryKey: ["employees"],
-        queryFn: async () => {
-            const response = await apiClient.get("/employees");
-            return response.data;
-        },
-        enabled: labelPickerVisible,
-    });
+    const { data: employees } = useEmployees(labelPickerVisible);
 
     const printLabel = useMutation({
         mutationFn: async () => {
@@ -232,6 +207,53 @@ export default function DocumentViewerScreen() {
         },
     });
 
+    // ── prep checklist (items P2L/PTL won't handle automatically) ──
+    // Same idea as motorOrderService's isNonPtlOrder check on the backend,
+    // but per item: an order's items that don't appear in parts.xlsx have
+    // to be physically prepared by hand, so the worker has to tap through
+    // all of them here before the print-label button unlocks below. Fetched
+    // only while the modal is open — most orders have nothing to check, so
+    // this stays fast, and there's no reason to fetch it before the worker
+    // has even opened the print flow.
+    const { data: prepChecklist, isLoading: prepChecklistLoading } = useQuery<{
+        items: { itemID: string; itemDesc: string; itemQuantity: number; unit: string; checked: boolean }[];
+        allPrepared: boolean;
+    }>({
+        queryKey: ["prep-items", docMeta?.project_number, docMeta?.position],
+        queryFn: async () => {
+            const response = await apiClient.get("/prep-queue/items", {
+                params: { projectNumber: docMeta!.project_number, position: docMeta!.position },
+            });
+            return response.data;
+        },
+        enabled: labelPickerVisible && canPrintLabel,
+    });
+    const prepItems = prepChecklist?.items ?? [];
+    // Fail safe while the checklist hasn't loaded yet (or errored): treat it
+    // as NOT fully prepared, never let a race let the print button through
+    // before we actually know what's still outstanding.
+    const prepAllChecked = prepChecklist?.allPrepared ?? false;
+
+    const checkPrepItem = useMutation({
+        mutationFn: async (item: { itemID: string; itemDesc: string }) => {
+            const response = await apiClient.post("/prep-queue/items/check", {
+                projectNumber: docMeta!.project_number,
+                position: docMeta!.position,
+                itemId: item.itemID,
+                itemDesc: item.itemDesc,
+                employeeName: selectedEmployee,
+            });
+            return response.data;
+        },
+        onSuccess: (data) => {
+            queryClient.setQueryData(["prep-items", docMeta?.project_number, docMeta?.position], data);
+        },
+        onError: (error: any) => {
+            const msg = error?.response?.data?.error || error.message;
+            setSnackbar({ visible: true, message: t("document.prepItemCheckError", { msg }) });
+        },
+    });
+
     // ── "Check" action (QC) ──
     // Records the third role on a cycle: who verified it's actually
     // correct, alongside who prepared it (order_preparation_log) and who
@@ -245,20 +267,11 @@ export default function DocumentViewerScreen() {
     // prep-queue flow), so this stays reachable from wherever a document is
     // opened.
     const [checkModalVisible, setCheckModalVisible] = useState(false);
-    const [checkEmployeeMenuVisible, setCheckEmployeeMenuVisible] = useState(false);
     const [checkSelectedEmployee, setCheckSelectedEmployee] = useState<string | null>(null);
     const [selectedCycleIndex, setSelectedCycleIndex] = useState<number | null>(null);
     const [checkStatusChoice, setCheckStatusChoice] = useState<CheckStatus>("ok");
     const [checkNote, setCheckNote] = useState("");
-
-    const { data: checkEmployees } = useQuery<Employee[]>({
-        queryKey: ["employees"],
-        queryFn: async () => {
-            const response = await apiClient.get("/employees");
-            return response.data;
-        },
-        enabled: checkModalVisible,
-    });
+    const { data: checkEmployees } = useEmployees(checkModalVisible);
 
     const openCheckModal = () => {
         // Default to the first still-unchecked cycle so the common case
@@ -276,7 +289,6 @@ export default function DocumentViewerScreen() {
         setSelectedCycleIndex(null);
         setCheckStatusChoice("ok");
         setCheckNote("");
-        setCheckEmployeeMenuVisible(false);
     };
 
     const submitCheck = useMutation({
@@ -463,35 +475,76 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                 <Text variant="bodyMedium" style={{ color: "#666", marginBottom: 16 }}>
                     {t("document.printLabelHint")}
                 </Text>
-                <Menu
-                    visible={employeeMenuVisible}
-                    onDismiss={() => setEmployeeMenuVisible(false)}
-                    anchor={
-                        <TouchableOpacity style={styles.dropdown} onPress={() => setEmployeeMenuVisible(true)}>
-                            <Text style={selectedEmployee ? styles.dropdownText : styles.dropdownPlaceholder}>
-                                {selectedEmployee ?? t("kiosk.selectEmployee")}
-                            </Text>
-                        </TouchableOpacity>
-                    }>
-                    {(employees ?? []).map((emp) => (
-                        <Menu.Item
-                            key={emp.id}
-                            title={emp.name}
-                            onPress={() => {
-                                setSelectedEmployee(emp.name);
-                                setEmployeeMenuVisible(false);
-                            }}
-                        />
-                    ))}
-                    {(employees ?? []).length === 0 && <Menu.Item title={t("kiosk.noEmployees")} disabled />}
-                </Menu>
+                <EmployeePicker
+                    employees={employees}
+                    selected={selectedEmployee}
+                    onSelect={setSelectedEmployee}
+                    style={{ marginBottom: 16 }}
+                />
+
+                {prepChecklistLoading && (
+                    <ActivityIndicator size="small" style={{ marginVertical: 12 }} />
+                )}
+
+                {prepItems.length > 0 && (
+                    <View style={{ marginTop: 16, marginBottom: 8 }}>
+                        <Text variant="titleSmall" style={{ marginBottom: 4 }}>
+                            {t("document.prepChecklistTitle")}
+                        </Text>
+                        <Text variant="bodySmall" style={{ color: "#666", marginBottom: 8 }}>
+                            {t("document.prepChecklistHint")}
+                        </Text>
+                        <ScrollView style={styles.prepChecklist}>
+                            {prepItems.map((item) => {
+                                const rowDisabled =
+                                    item.checked || !selectedEmployee || checkPrepItem.isPending;
+                                return (
+                                    <TouchableOpacity
+                                        key={item.itemID}
+                                        style={styles.prepChecklistRow}
+                                        activeOpacity={0.7}
+                                        disabled={rowDisabled}
+                                        onPress={() =>
+                                            checkPrepItem.mutate({
+                                                itemID: item.itemID,
+                                                itemDesc: item.itemDesc,
+                                            })
+                                        }>
+                                        <Ionicons
+                                            name={item.checked ? "checkbox" : "square-outline"}
+                                            size={22}
+                                            color={item.checked ? "#2e7d32" : "#909090"}
+                                        />
+                                        <View style={{ flex: 1, marginLeft: 10 }}>
+                                            <Text
+                                                variant="bodyMedium"
+                                                style={item.checked ? styles.prepItemTextChecked : undefined}>
+                                                {item.itemDesc || item.itemID}
+                                            </Text>
+                                            <Text variant="bodySmall" style={{ color: "#999" }}>
+                                                {item.itemID} · {item.itemQuantity} {item.unit}
+                                            </Text>
+                                        </View>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </ScrollView>
+                    </View>
+                )}
+
                 <TouchableOpacity
                     style={[
                         styles.confirmBtn,
-                        (!selectedEmployee || printLabel.isPending) && styles.confirmBtnDisabled,
+                        (!selectedEmployee ||
+                            printLabel.isPending ||
+                            prepChecklistLoading ||
+                            !prepAllChecked) &&
+                            styles.confirmBtnDisabled,
                     ]}
                     activeOpacity={0.8}
-                    disabled={!selectedEmployee || printLabel.isPending}
+                    disabled={
+                        !selectedEmployee || printLabel.isPending || prepChecklistLoading || !prepAllChecked
+                    }
                     onPress={() => printLabel.mutate()}>
                     {printLabel.isPending ?
                         <ActivityIndicator size="small" color="#fff" />
@@ -513,28 +566,12 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                 <Text variant="bodyMedium" style={{ color: "#666", marginBottom: 16 }}>
                     {t("document.finishHint")}
                 </Text>
-                <Menu
-                    visible={finishEmployeeMenuVisible}
-                    onDismiss={() => setFinishEmployeeMenuVisible(false)}
-                    anchor={
-                        <TouchableOpacity style={styles.dropdown} onPress={() => setFinishEmployeeMenuVisible(true)}>
-                            <Text style={finishSelectedEmployee ? styles.dropdownText : styles.dropdownPlaceholder}>
-                                {finishSelectedEmployee ?? t("kiosk.selectEmployee")}
-                            </Text>
-                        </TouchableOpacity>
-                    }>
-                    {(finishEmployees ?? []).map((emp) => (
-                        <Menu.Item
-                            key={emp.id}
-                            title={emp.name}
-                            onPress={() => {
-                                setFinishSelectedEmployee(emp.name);
-                                setFinishEmployeeMenuVisible(false);
-                            }}
-                        />
-                    ))}
-                    {(finishEmployees ?? []).length === 0 && <Menu.Item title={t("kiosk.noEmployees")} disabled />}
-                </Menu>
+                <EmployeePicker
+                    employees={finishEmployees}
+                    selected={finishSelectedEmployee}
+                    onSelect={setFinishSelectedEmployee}
+                    style={{ marginBottom: 16 }}
+                />
                 <TouchableOpacity
                     style={[
                         styles.confirmBtn,
@@ -643,28 +680,12 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                     style={{ marginBottom: 16 }}
                 />
 
-                <Menu
-                    visible={checkEmployeeMenuVisible}
-                    onDismiss={() => setCheckEmployeeMenuVisible(false)}
-                    anchor={
-                        <TouchableOpacity style={styles.dropdown} onPress={() => setCheckEmployeeMenuVisible(true)}>
-                            <Text style={checkSelectedEmployee ? styles.dropdownText : styles.dropdownPlaceholder}>
-                                {checkSelectedEmployee ?? t("kiosk.selectEmployee")}
-                            </Text>
-                        </TouchableOpacity>
-                    }>
-                    {(checkEmployees ?? []).map((emp) => (
-                        <Menu.Item
-                            key={emp.id}
-                            title={emp.name}
-                            onPress={() => {
-                                setCheckSelectedEmployee(emp.name);
-                                setCheckEmployeeMenuVisible(false);
-                            }}
-                        />
-                    ))}
-                    {(checkEmployees ?? []).length === 0 && <Menu.Item title={t("kiosk.noEmployees")} disabled />}
-                </Menu>
+                <EmployeePicker
+                    employees={checkEmployees}
+                    selected={checkSelectedEmployee}
+                    onSelect={setCheckSelectedEmployee}
+                    style={{ marginBottom: 16 }}
+                />
                 <TouchableOpacity
                     style={[
                         styles.confirmBtn,
@@ -892,16 +913,21 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         padding: 24,
     },
-    dropdown: {
+    prepChecklist: {
+        maxHeight: 220,
         borderWidth: 1,
-        borderColor: "#ddd",
+        borderColor: "#eee",
         borderRadius: 8,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        marginBottom: 16,
     },
-    dropdownText: { fontSize: 16 },
-    dropdownPlaceholder: { fontSize: 16, color: "#aaa" },
+    prepChecklistRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: "#f0f0f0",
+    },
+    prepItemTextChecked: { color: "#999", textDecorationLine: "line-through" },
     confirmBtn: {
         backgroundColor: "#ff5100",
         borderRadius: 10,

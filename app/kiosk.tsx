@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from "react-native";
-import { Text, Portal, Modal, Menu, Divider, Snackbar } from "react-native-paper";
+import { Text, Portal, Modal, Divider, Snackbar } from "react-native-paper";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
@@ -10,6 +10,8 @@ import socket from "../src/services/socket";
 import { Workstation, WorkstationOrder } from "../src/types";
 import { t } from "../src/i18n";
 import LanguageSwitcher from "../src/components/LanguageSwitcher";
+import { useEmployees } from "../src/hooks/useEmployees";
+import EmployeePicker from "../src/components/EmployeePicker";
 
 // Sentinel value used when Completion mode should accept FINISHED events for any
 // workplace without showing or storing a human-visible workplace label.
@@ -29,11 +31,6 @@ interface OrderUpdatePayload {
     _id: string;
     datetime: string;
     action: "STARTED" | "FINISHED";
-}
-
-interface Employee {
-    id: number;
-    name: string;
 }
 
 type CompletionStatus = "complete" | "complete_with_changes" | "missing_product" | "shipped_incomplete";
@@ -240,7 +237,6 @@ function CompletionKiosk({
 }) {
     const router = useRouter();
     const [pending, setPending] = useState<OrderUpdatePayload[]>([]);
-    const [employeeMenuVisible, setEmployeeMenuVisible] = useState(false);
     const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
     const [selectedStatus, setSelectedStatus] = useState<CompletionStatus | null>(null);
     const [connected, setConnected] = useState(socket.connected);
@@ -251,13 +247,7 @@ function CompletionKiosk({
 
     const current = pending[0] ?? null;
 
-    const { data: employees } = useQuery<Employee[]>({
-        queryKey: ["employees"],
-        queryFn: async () => {
-            const response = await apiClient.get("/employees");
-            return response.data;
-        },
-    });
+    const { data: employees } = useEmployees();
 
     useEffect(() => {
         const onConnect = () => setConnected(true);
@@ -438,34 +428,11 @@ function CompletionKiosk({
                             <Text variant="labelLarge" style={styles.sectionLabel}>
                                 {t("kiosk.whoFinished")}
                             </Text>
-                            <Menu
-                                visible={employeeMenuVisible}
-                                onDismiss={() => setEmployeeMenuVisible(false)}
-                                anchor={
-                                    <TouchableOpacity
-                                        style={styles.dropdown}
-                                        onPress={() => setEmployeeMenuVisible(true)}>
-                                        <Text
-                                            style={selectedEmployee ? styles.dropdownText : styles.dropdownPlaceholder}>
-                                            {selectedEmployee ?? t("kiosk.selectEmployee")}
-                                        </Text>
-                                        <Ionicons name="chevron-down" size={18} color="#909090" />
-                                    </TouchableOpacity>
-                                }>
-                                {(employees ?? []).map((emp) => (
-                                    <Menu.Item
-                                        key={emp.id}
-                                        title={emp.name}
-                                        onPress={() => {
-                                            setSelectedEmployee(emp.name);
-                                            setEmployeeMenuVisible(false);
-                                        }}
-                                    />
-                                ))}
-                                {(employees ?? []).length === 0 && (
-                                    <Menu.Item title={t("kiosk.noEmployees")} disabled />
-                                )}
-                            </Menu>
+                            <EmployeePicker
+                                employees={employees}
+                                selected={selectedEmployee}
+                                onSelect={setSelectedEmployee}
+                            />
 
                             <Text variant="labelLarge" style={[styles.sectionLabel, { marginTop: 16 }]}>
                                 {t("kiosk.status")}
@@ -763,18 +730,6 @@ const styles = StyleSheet.create({
     },
     openDocBtnText: { color: "#ff5100", fontWeight: "600" },
     sectionLabel: { color: "#909090", marginBottom: 8 },
-    dropdown: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        borderWidth: 1,
-        borderColor: "#ddd",
-        borderRadius: 8,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-    },
-    dropdownText: { fontSize: 16 },
-    dropdownPlaceholder: { fontSize: 16, color: "#aaa" },
     statusOption: {
         flexDirection: "row",
         alignItems: "center",
