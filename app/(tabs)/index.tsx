@@ -8,6 +8,7 @@ import apiClient from "../../src/api/client";
 import socket from "../../src/services/socket";
 import { Workstation } from "../../src/types";
 import { t } from "../../src/i18n";
+import LanguageSwitcher from "../../src/components/LanguageSwitcher";
 
 export default function WorkstationsScreen() {
     const router = useRouter();
@@ -91,6 +92,7 @@ export default function WorkstationsScreen() {
                             <ActivityIndicator size="small" color="#ff5100" />
                         :   <Ionicons name="refresh" size={22} color="#ff5100" />}
                     </TouchableOpacity>
+                    <LanguageSwitcher />
                 </View>
             ),
         });

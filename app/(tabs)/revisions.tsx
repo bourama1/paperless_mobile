@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import apiClient from "../../src/api/client";
 import { DocumentsOverviewResponse, DocumentOverviewItem, CompletionStatus } from "../../src/types";
 import { t } from "../../src/i18n";
+import LanguageSwitcher from "../../src/components/LanguageSwitcher";
 
 function formatTime(iso: string): string {
     return new Date(iso).toLocaleString("cs-CZ", {
@@ -69,11 +70,14 @@ export default function DocumentsScreen() {
     useLayoutEffect(() => {
         navigation.setOptions({
             headerRight: () => (
-                <TouchableOpacity onPress={() => refetch()} disabled={isRefetching} style={{ marginRight: 16 }}>
-                    {isRefetching ?
-                        <ActivityIndicator size="small" color="#ff5100" />
-                    :   <Ionicons name="refresh" size={22} color="#ff5100" />}
-                </TouchableOpacity>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <TouchableOpacity onPress={() => refetch()} disabled={isRefetching} style={{ marginRight: 16 }}>
+                        {isRefetching ?
+                            <ActivityIndicator size="small" color="#ff5100" />
+                        :   <Ionicons name="refresh" size={22} color="#ff5100" />}
+                    </TouchableOpacity>
+                    <LanguageSwitcher />
+                </View>
             ),
         });
     }, [navigation, refetch, isRefetching]);
