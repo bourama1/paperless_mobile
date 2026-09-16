@@ -158,7 +158,6 @@
     "prepQueue.lockedHint": "Це замовлення заблоковано в Masterplan (tisk_zamcen=1) і не може бути підготовлено.",
     "workstations.label.salesOrder": "Замовлення на продаж:",
     "workstations.label.productOrder": "Вир. замовл.:",
-    "kiosk.toorsSuccess": "Виробниче замовлення успішно закрито в ERP",
-    "kiosk.toorsError": "Помилка закриття в ERP: {error}",
-    "kiosk.toorsNotFound": "Виробниче замовлення не знайдено в ERP (№ {order})"
+    "kiosk.toorsQueued": "Виробниче замовлення додано в чергу для закриття в ERP",
+    "kiosk.toorsError": "Не вдалося додати закриття в ERP до черги: {error}"
 }

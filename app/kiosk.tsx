@@ -312,15 +312,12 @@ function CompletionKiosk({
             setSelectedEmployee(null);
             setSelectedStatus(null);
 
-            // Show ERP close result if the backend attempted it
+            // The backend only confirms the ERP close was QUEUED — it
+            // doesn't wait for TOORS itself, so there's nothing more to
+            // report here than "queued" or "couldn't even queue it".
             if (data?.toors) {
-                if (data.toors.success) {
-                    setSnackbar({ visible: true, message: t("kiosk.toorsSuccess") });
-                } else if (data.toors.status === 404) {
-                    setSnackbar({
-                        visible: true,
-                        message: t("kiosk.toorsNotFound", { order: data.toors.error ?? "" }),
-                    });
+                if (data.toors.queued) {
+                    setSnackbar({ visible: true, message: t("kiosk.toorsQueued") });
                 } else if (data.toors.error) {
                     setSnackbar({
                         visible: true,
