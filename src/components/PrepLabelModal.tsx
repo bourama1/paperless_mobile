@@ -99,6 +99,26 @@ export default function PrepLabelModal({
         },
     });
 
+    // Lets a worker undo a misclick — tapping an already-checked item calls
+    // this instead of checkPrepItem (see the row's onPress below).
+    const uncheckPrepItem = useMutation({
+        mutationFn: async (item: { itemID: string }) => {
+            const response = await apiClient.post("/prep-queue/items/uncheck", {
+                projectNumber,
+                position,
+                itemId: item.itemID,
+            });
+            return response.data;
+        },
+        onSuccess: (data) => {
+            queryClient.setQueryData(["prep-items", projectNumber, position], data);
+        },
+        onError: (error: any) => {
+            const msg = error?.response?.data?.error || error.message;
+            setSnackbar({ visible: true, message: t("document.prepItemCheckError", { msg }) });
+        },
+    });
+
     const printLabel = useMutation({
         mutationFn: async () => {
             if (!selectedEmployee) return;
@@ -166,17 +186,10 @@ export default function PrepLabelModal({
                     <Text variant="bodyMedium" style={{ color: "#666", marginBottom: 16 }}>
                         {t("document.printLabelHint")}
                     </Text>
-                    <EmployeePicker
-                        employees={employees}
-                        selected={selectedEmployee}
-                        onSelect={setSelectedEmployee}
-                        style={{ marginBottom: 16 }}
-                    />
-
                     {prepChecklistLoading && <ActivityIndicator size="small" style={{ marginVertical: 12 }} />}
 
                     {prepItems.length > 0 && (
-                        <View style={{ marginTop: 16, marginBottom: 8 }}>
+                        <View style={{ marginBottom: 16 }}>
                             <Text variant="titleSmall" style={{ marginBottom: 4 }}>
                                 {t("document.prepChecklistTitle")}
                             </Text>
@@ -185,7 +198,8 @@ export default function PrepLabelModal({
                             </Text>
                             <ScrollView style={styles.prepChecklist}>
                                 {prepItems.map((item) => {
-                                    const rowDisabled = item.checked || !selectedEmployee || checkPrepItem.isPending;
+                                    const rowDisabled =
+                                        !selectedEmployee || checkPrepItem.isPending || uncheckPrepItem.isPending;
                                     return (
                                         <TouchableOpacity
                                             key={item.itemID}
@@ -193,7 +207,9 @@ export default function PrepLabelModal({
                                             activeOpacity={0.7}
                                             disabled={rowDisabled}
                                             onPress={() =>
-                                                checkPrepItem.mutate({ itemID: item.itemID, itemDesc: item.itemDesc })
+                                                item.checked ?
+                                                    uncheckPrepItem.mutate({ itemID: item.itemID })
+                                                :   checkPrepItem.mutate({ itemID: item.itemID, itemDesc: item.itemDesc })
                                             }>
                                             <Ionicons
                                                 name={item.checked ? "checkbox" : "square-outline"}
@@ -216,6 +232,13 @@ export default function PrepLabelModal({
                             </ScrollView>
                         </View>
                     )}
+
+                    <EmployeePicker
+                        employees={employees}
+                        selected={selectedEmployee}
+                        onSelect={setSelectedEmployee}
+                        style={{ marginBottom: 16 }}
+                    />
 
                     <TouchableOpacity
                         style={[
