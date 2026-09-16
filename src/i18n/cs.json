@@ -106,6 +106,8 @@
     "docs.statusMissing": "Chybí díl",
     "docs.statusIncomplete": "Nekompletní",
     "docs.originalImport": "Původní import z doc manageru",
+    "docs.completedAt": "Dokončeno",
+    "docs.openError": "Nepodařilo se otevřít dokument: {msg}",
     "document.printLabel": "Tisk štítku",
     "document.printLabelHint": "Kdo připravuje tuto zakázku?",
     "document.printLabelConfirm": "Vytisknout štítek",

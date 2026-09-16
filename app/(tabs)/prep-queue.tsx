@@ -31,7 +31,11 @@ interface PrepQueueItem {
 }
 
 function formatDate(iso: string): string {
+    // Explicit timeZone — device/browser OS clocks on the factory floor
+    // aren't reliably set to the right zone; without this the displayed
+    // date can silently shift relative to the real (UTC-stored) value.
     return new Date(iso).toLocaleDateString("cs-CZ", {
+        timeZone: "Europe/Prague",
         weekday: "short",
         day: "numeric",
         month: "numeric",
@@ -303,9 +307,27 @@ export default function PrepQueueScreen() {
                             directPrintMode={directPrintMode}
                             isOpening={openBom.isPending && openBom.variables?.id === item.id}
                             disabled={openBom.isPending || item.locked === true}
-                            onPrepare={() =>
-                                directPrintMode ? setDirectPrintItem(item) : openBom.mutate(item)
-                            }
+                            onPrepare={() => {
+                                if (directPrintMode) {
+                                    // Skips the PDF viewer, but import-pbom's
+                                    // find-or-create is also what creates this
+                                    // order's "documents" row — the only thing
+                                    // that makes it show up in the Docs tab
+                                    // afterwards (see filesController.getDocumentsOverview).
+                                    // Fire-and-forget: nothing here needs the
+                                    // response, so don't block on it.
+                                    apiClient
+                                        .post("/workstations/import-pbom", {
+                                            projectNumber: item.project_number,
+                                            position: item.position,
+                                            workplace: item.workplace,
+                                        })
+                                        .catch(() => {});
+                                    setDirectPrintItem(item);
+                                } else {
+                                    openBom.mutate(item);
+                                }
+                            }}
                         />
                     )}
                 />

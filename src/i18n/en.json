@@ -106,6 +106,8 @@
     "docs.statusMissing": "Missing part",
     "docs.statusIncomplete": "Incomplete",
     "docs.originalImport": "Original import from doc manager",
+    "docs.completedAt": "Completed",
+    "docs.openError": "Could not open document: {msg}",
     "document.printLabel": "Print label",
     "document.printLabelHint": "Who is preparing this order?",
     "document.printLabelConfirm": "Print label",

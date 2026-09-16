@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useLayoutEffect } from "react";
-import { FlatList, View, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
+import { FlatList, View, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import { Card, Text, Chip, Divider } from "react-native-paper";
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect, useRouter, useNavigation } from "expo-router";
@@ -9,8 +9,15 @@ import { DocumentsOverviewResponse, DocumentOverviewItem, CompletionStatus } fro
 import { t } from "../../src/i18n";
 import LanguageSwitcher from "../../src/components/LanguageSwitcher";
 
+// Explicit timeZone — the factory's tablets/web browsers can't be trusted
+// to have their OS clock set to the right zone, and without this,
+// toLocaleString silently uses whatever zone the device happens to be in,
+// shifting displayed times away from the real (correct, UTC-stored) value.
+const FACTORY_TIME_ZONE = "Europe/Prague";
+
 function formatTime(iso: string): string {
     return new Date(iso).toLocaleString("cs-CZ", {
+        timeZone: FACTORY_TIME_ZONE,
         day: "numeric",
         month: "numeric",
         hour: "2-digit",
@@ -143,7 +150,11 @@ export default function DocumentsScreen() {
             : items.length > 0 ?
                 <FlatList
                     data={items}
-                    keyExtractor={(item) => item.document_id.toString()}
+                    keyExtractor={(item) =>
+                        item.document_id != null
+                            ? item.document_id.toString()
+                            : `${item.project_number}-${item.position}`
+                    }
                     onRefresh={refetch}
                     refreshing={isRefetching}
                     contentContainerStyle={styles.list}
@@ -158,33 +169,64 @@ export default function DocumentsScreen() {
 }
 
 function DocumentCard({ item, router }: { item: DocumentOverviewItem; router: ReturnType<typeof useRouter> }) {
+    const [importing, setImporting] = useState(false);
     const statusMeta = item.status ? STATUS_META[item.status] : null;
     const latest = item.revisions[0]; // revisions come back version-desc from the backend
 
+    // This order reached a kiosk finishing state but its BOM was never
+    // opened/imported in-app (e.g. finished via the prep queue's direct
+    // print mode) — there's no documents row/id to navigate to yet, so
+    // create one on demand (find-or-create on the backend) before opening it.
+    const handlePress = async () => {
+        if (item.document_id != null) {
+            router.push({
+                pathname: `/document/${item.document_id}`,
+                params: {
+                    filename: latest?.filename || "",
+                    version: latest?.version || 1,
+                },
+            });
+            return;
+        }
+
+        setImporting(true);
+        try {
+            const response = await apiClient.post("/workstations/import-pbom", {
+                projectNumber: item.project_number,
+                position: item.position,
+                workplace: item.workstation,
+            });
+            const doc = response.data;
+            const rev = doc.revisions?.[0];
+            router.push({
+                pathname: `/document/${doc.id}`,
+                params: {
+                    filename: rev?.filename || doc.name || "",
+                    version: rev?.version || 1,
+                },
+            });
+        } catch (error: any) {
+            Alert.alert(t("docs.openError"), error?.response?.data?.error || error.message);
+        } finally {
+            setImporting(false);
+        }
+    };
+
     return (
-        <TouchableOpacity
-            onPress={() =>
-                router.push({
-                    pathname: `/document/${item.document_id}`,
-                    params: {
-                        filename: latest?.filename || "",
-                        version: latest?.version || 1,
-                    },
-                })
-            }
-            activeOpacity={0.7}>
+        <TouchableOpacity onPress={handlePress} activeOpacity={0.7} disabled={importing}>
             <Card style={styles.card} mode="outlined">
                 <Card.Title
-                    title={item.document_name}
+                    title={item.document_name || `${t("workstations.label.project")} ${item.project_number}`}
                     titleStyle={styles.cardTitle}
                     subtitle={
-                        item.project_number && item.position
+                        (item.project_number && item.position
                             ? `${t("workstations.label.project")} ${item.project_number}  ·  ${t("workstations.label.position")} ${item.position}`
                             : item.project_number
                               ? `${t("workstations.label.project")} ${item.project_number}`
-                              : undefined
+                              : "") +
+                        `  ·  ${t("docs.completedAt")}: ${formatTime(item.completed_at)}`
                     }
-                    right={() => (
+                    right={() => (importing ? <ActivityIndicator size="small" style={{ marginRight: 12 }} /> : (
                         <View style={styles.chipRow}>
                             {item.revisioned && (
                                 <Chip mode="flat" compact style={styles.revisionedChip} textStyle={styles.chipText}>
@@ -213,7 +255,7 @@ function DocumentCard({ item, router }: { item: DocumentOverviewItem; router: Re
                                 </Chip>
                             )}
                         </View>
-                    )}
+                    ))}
                 />
                 {!item.checked && item.unchecked_cycles.length > 0 && (
                     <Card.Content style={styles.uncheckedCyclesRow}>

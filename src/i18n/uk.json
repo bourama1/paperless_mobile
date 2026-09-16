@@ -106,6 +106,8 @@
     "docs.statusMissing": "Відсутня деталь",
     "docs.statusIncomplete": "Неповне",
     "docs.originalImport": "Оригінальний імпорт з doc manager",
+    "docs.completedAt": "Завершено",
+    "docs.openError": "Не вдалося відкрити документ: {msg}",
     "document.printLabel": "Друк етикетки",
     "document.printLabelHint": "Хто готує це замовлення?",
     "document.printLabelConfirm": "Надрукувати етикетку",

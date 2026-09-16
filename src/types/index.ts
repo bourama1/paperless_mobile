@@ -93,13 +93,22 @@ export interface CycleCheck {
 }
 
 export interface DocumentOverviewItem {
-  document_id: number;
-  document_name: string;
+  // Null when this order reached a kiosk finishing state but its BOM was
+  // never opened/imported in-app — see filesController.getDocumentsOverview.
+  document_id: number | null;
+  document_name: string | null;
   project_number: string | null;
   position: string | null;
+  // The workplace the order was completed at (order_completion_log.workstation)
+  // — used to import the BOM on demand when document_id is null.
+  workstation: string | null;
   document_type: number | null;
-  created_at: string;
-  updated_at: string;
+  created_at: string | null;
+  updated_at: string | null;
+  // When the kiosk operator actually finished this order — use this for
+  // display, not created_at/updated_at (those only reflect if/when someone
+  // happened to open the BOM in-app).
+  completed_at: string;
   status: CompletionStatus | null;
   revisioned: boolean;
   revisions: RevisionOverview[];
