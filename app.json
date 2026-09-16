@@ -18,7 +18,7 @@
         },
         "android": {
             "package": "com.bourama1.paperless_mobile",
-            "versionCode": 3,
+            "versionCode": 10003,
             "adaptiveIcon": {
                 "foregroundImage": "./assets/adaptive-icon.png",
                 "backgroundColor": "#ffffff"
@@ -30,7 +30,12 @@
             "favicon": "./assets/favicon.png",
             "output": "single"
         },
-        "plugins": ["expo-router", "expo-asset", "expo-font", "./plugins/withReleaseSigning"],
+        "plugins": [
+            "expo-router",
+            "expo-asset",
+            "expo-font",
+            "./plugins/withReleaseSigning"
+        ],
         "extra": {
             "router": {},
             "eas": {

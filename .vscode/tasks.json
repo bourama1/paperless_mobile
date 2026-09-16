@@ -2,6 +2,17 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "Mobile: Sync versionCode from version",
+            "type": "shell",
+            "command": "node scripts/sync-version-code.js",
+            "options": {
+                "cwd": "${workspaceFolder}\\paperless_mobile"
+            },
+            "group": "build",
+            "problemMatcher": [],
+            "detail": "Sets android.versionCode in app.json from expo.version via major*10000 + minor*100 + patch (e.g. \"1.2.15\" -> 10215), so there's one number (version) to bump instead of two, and it stays strictly increasing across minor/major bumps too. Runs before every prebuild (see dependsOn below) since Android refuses to install an APK whose versionCode isn't strictly greater than what's already installed. Minor/patch must each stay below 100 — see the script's own comment."
+        },
+        {
             "label": "Mobile: Prebuild Android (apply plugins)",
             "type": "shell",
             "command": "npx expo prebuild --platform android",
@@ -9,6 +20,8 @@
                 "cwd": "${workspaceFolder}\\paperless_mobile"
             },
             "group": "build",
+            "dependsOn": ["Mobile: Sync versionCode from version"],
+            "dependsOrder": "sequence",
             "problemMatcher": [],
             "detail": "Re-applies app.json + plugins/ onto the existing android/ folder (cert pinning, release signing). Deliberately NOT --clean for routine use: a full clean wipes android/local.properties (your Android SDK path) every time, which breaks the next Gradle build unless ANDROID_HOME is set as a permanent environment variable (see certs/README.md — do this once, it's the real fix). Non-clean prebuild is idempotent and safe to re-run before every build; use 'Mobile: Full Clean Rebuild' instead if something seems stuck or a plugin change isn't taking effect."
         },
@@ -20,6 +33,8 @@
                 "cwd": "${workspaceFolder}\\paperless_mobile"
             },
             "group": "build",
+            "dependsOn": ["Mobile: Sync versionCode from version"],
+            "dependsOrder": "sequence",
             "problemMatcher": [],
             "detail": "Deletes and fully regenerates android/ from scratch — including android/local.properties (your Android SDK path). The next Gradle build will fail with 'SDK location not found' unless ANDROID_HOME is set as a permanent environment variable first (see certs/README.md). Only use this when troubleshooting, e.g. after adding a new native dependency or if a plugin change isn't showing up — not as a routine step before every build."
         },
