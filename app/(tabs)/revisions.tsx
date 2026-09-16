@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useLayoutEffect } from "react";
 import { FlatList, View, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
-import { Card, Text, Chip, Divider } from "react-native-paper";
+import { Card, Text, Chip, Divider, Snackbar } from "react-native-paper";
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect, useRouter, useNavigation } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,6 +8,9 @@ import apiClient from "../../src/api/client";
 import { DocumentsOverviewResponse, DocumentOverviewItem, CompletionStatus } from "../../src/types";
 import { t } from "../../src/i18n";
 import LanguageSwitcher from "../../src/components/LanguageSwitcher";
+import { useBarcodeScan } from "../../src/hooks/useBarcodeScan";
+import BarcodeScannerModal from "../../src/components/BarcodeScannerModal";
+import PbomTypePickerModal from "../../src/components/PbomTypePickerModal";
 
 // Explicit timeZone — the factory's tablets/web browsers can't be trusted
 // to have their OS clock set to the right zone, and without this,
@@ -45,6 +48,7 @@ export default function DocumentsScreen() {
     const [statusFilters, setStatusFilters] = useState<Set<CompletionStatus>>(new Set());
     const [revisionedOnly, setRevisionedOnly] = useState(false);
     const [uncheckedOnly, setUncheckedOnly] = useState(false);
+    const order = useBarcodeScan();
 
     const statusParam = Array.from(statusFilters).join(",");
 
@@ -78,6 +82,9 @@ export default function DocumentsScreen() {
         navigation.setOptions({
             headerRight: () => (
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <TouchableOpacity onPress={order.scanner.open} style={{ marginRight: 16 }}>
+                        <Ionicons name="barcode-outline" size={22} color="#ff5100" />
+                    </TouchableOpacity>
                     <TouchableOpacity onPress={() => refetch()} disabled={isRefetching} style={{ marginRight: 16 }}>
                         {isRefetching ?
                             <ActivityIndicator size="small" color="#ff5100" />
@@ -87,7 +94,7 @@ export default function DocumentsScreen() {
                 </View>
             ),
         });
-    }, [navigation, refetch, isRefetching]);
+    }, [navigation, refetch, isRefetching, order.scanner.open]);
 
     const toggleStatus = (value: CompletionStatus) => {
         setStatusFilters((prev) => {
@@ -164,6 +171,26 @@ export default function DocumentsScreen() {
                     <Text variant="bodyLarge">{t("revisions.empty")}</Text>
                 </View>
             }
+
+            <PbomTypePickerModal
+                visible={order.picker.visible}
+                options={order.picker.options}
+                disabled={order.picker.disabled}
+                onDismiss={order.picker.onDismiss}
+                onSelect={order.picker.onSelect}
+            />
+
+            <BarcodeScannerModal
+                visible={order.scanner.visible}
+                onDismiss={order.scanner.onDismiss}
+                onScanned={order.scanner.onScanned}
+                resolving={order.scanner.resolving}
+                errorMessage={order.scanner.errorMessage}
+            />
+
+            <Snackbar visible={order.snackbar.visible} onDismiss={order.snackbar.onDismiss}>
+                {order.snackbar.message}
+            </Snackbar>
         </View>
     );
 }
