@@ -140,6 +140,7 @@
     "prepQueue.label": "Štítek",
     "prepQueue.salesOrder": "Prod. obj.",
     "prepQueue.prepare": "Připravit",
+    "prepQueue.directPrintMode": "Tisknout bez otevření PDF",
     "prepQueue.openBom": "Zobrazit BOM",
     "prepQueue.openBomError": "Nepodařilo se otevřít BOM: {msg}",
     "prepQueue.refreshFoundNew": "Načteno {count} nových položek.",

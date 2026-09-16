@@ -1,11 +1,19 @@
-import React, { useState, useMemo, useLayoutEffect } from "react";
+import React, { useState, useMemo, useLayoutEffect, useEffect } from "react";
 import { FlatList, View, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
-import { Card, Text, Chip, Divider, Snackbar } from "react-native-paper";
+import { Card, Text, Chip, Divider, Snackbar, Switch } from "react-native-paper";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigation, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import apiClient from "../../src/api/client";
 import { t } from "../../src/i18n";
+import PrepLabelModal from "../../src/components/PrepLabelModal";
+import LanguageSwitcher from "../../src/components/LanguageSwitcher";
+
+// Persisted locally (per device) — a personal workflow preference, not a
+// business rule, so this doesn't need to live on the backend or sync
+// across devices.
+const DIRECT_PRINT_MODE_KEY = "paperless_mobile_prep_direct_print_mode";
 
 interface PrepQueueItem {
     id: number;
@@ -45,6 +53,25 @@ export default function PrepQueueScreen() {
     const [selectedHardwareTypes, setSelectedHardwareTypes] = useState<Set<string>>(new Set());
     const [snackbar, setSnackbar] = useState({ visible: false, message: "" });
 
+    // "Direct print" mode skips opening the PDF entirely — Prepare opens
+    // the same employee-picker + non-PTL-item checklist PrepLabelModal
+    // already used from inside the document viewer, straight from this
+    // list. "PDF" mode (the original behavior) opens the BOM for review
+    // first, and printing happens from inside it.
+    const [directPrintMode, setDirectPrintMode] = useState(false);
+    const [directPrintItem, setDirectPrintItem] = useState<PrepQueueItem | null>(null);
+
+    useEffect(() => {
+        AsyncStorage.getItem(DIRECT_PRINT_MODE_KEY)
+            .then((stored) => setDirectPrintMode(stored === "1"))
+            .catch(() => {});
+    }, []);
+
+    const toggleDirectPrintMode = (value: boolean) => {
+        setDirectPrintMode(value);
+        AsyncStorage.setItem(DIRECT_PRINT_MODE_KEY, value ? "1" : "0").catch(() => {});
+    };
+
     const {
         data,
         isLoading,
@@ -82,14 +109,17 @@ export default function PrepQueueScreen() {
     useLayoutEffect(() => {
         navigation.setOptions({
             headerRight: () => (
-                <TouchableOpacity
-                    onPress={() => refreshPlan.mutate()}
-                    disabled={refreshPlan.isPending}
-                    style={{ marginRight: 16 }}>
-                    {refreshPlan.isPending ?
-                        <ActivityIndicator size="small" color="#ff5100" />
-                    :   <Ionicons name="cloud-download-outline" size={22} color="#ff5100" />}
-                </TouchableOpacity>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <TouchableOpacity
+                        onPress={() => refreshPlan.mutate()}
+                        disabled={refreshPlan.isPending}
+                        style={{ marginRight: 16 }}>
+                        {refreshPlan.isPending ?
+                            <ActivityIndicator size="small" color="#ff5100" />
+                        :   <Ionicons name="cloud-download-outline" size={22} color="#ff5100" />}
+                    </TouchableOpacity>
+                    <LanguageSwitcher />
+                </View>
             ),
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -180,6 +210,10 @@ export default function PrepQueueScreen() {
 
     return (
         <View style={styles.container}>
+            <View style={styles.modeRow}>
+                <Text variant="bodyMedium">{t("prepQueue.directPrintMode")}</Text>
+                <Switch value={directPrintMode} onValueChange={toggleDirectPrintMode} color="#ff5100" />
+            </View>
             <View style={styles.filterRow}>
                 <Chip
                     mode={selectedDate === null ? "flat" : "outlined"}
@@ -266,9 +300,12 @@ export default function PrepQueueScreen() {
                     renderItem={({ item }) => (
                         <PrepQueueCard
                             item={item}
+                            directPrintMode={directPrintMode}
                             isOpening={openBom.isPending && openBom.variables?.id === item.id}
                             disabled={openBom.isPending || item.locked === true}
-                            onPrepare={() => openBom.mutate(item)}
+                            onPrepare={() =>
+                                directPrintMode ? setDirectPrintItem(item) : openBom.mutate(item)
+                            }
                         />
                     )}
                 />
@@ -276,6 +313,14 @@ export default function PrepQueueScreen() {
                     <Text variant="bodyLarge">{t("prepQueue.empty")}</Text>
                 </View>
             }
+
+            <PrepLabelModal
+                visible={!!directPrintItem}
+                onDismiss={() => setDirectPrintItem(null)}
+                projectNumber={directPrintItem?.project_number ?? ""}
+                position={directPrintItem?.position ?? ""}
+                totalCycles={directPrintItem?.quantity ?? 1}
+            />
 
             <Snackbar
                 visible={snackbar.visible}
@@ -289,11 +334,13 @@ export default function PrepQueueScreen() {
 
 function PrepQueueCard({
     item,
+    directPrintMode,
     isOpening,
     disabled,
     onPrepare,
 }: {
     item: PrepQueueItem;
+    directPrintMode: boolean;
     isOpening: boolean;
     disabled: boolean;
     onPrepare: () => void;
@@ -388,7 +435,10 @@ function PrepQueueCard({
                             <Ionicons name="lock-closed" size={14} color="#fff" />
                             <Text style={styles.confirmBtnText}>{t("prepQueue.locked")}</Text>
                         </View>
-                    :   <Text style={styles.confirmBtnText}>{t("prepQueue.openBom")}</Text>}
+                    :   <Text style={styles.confirmBtnText}>
+                            {directPrintMode ? t("prepQueue.prepare") : t("prepQueue.openBom")}
+                        </Text>
+                    }
                 </TouchableOpacity>
             </Card.Actions>
         </Card>
@@ -398,6 +448,14 @@ function PrepQueueCard({
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: "#fff" },
     center: { flex: 1, justifyContent: "center", alignItems: "center" },
+    modeRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "flex-end",
+        gap: 8,
+        paddingHorizontal: 12,
+        paddingTop: 12,
+    },
     filterRow: {
         flexDirection: "row",
         flexWrap: "wrap",

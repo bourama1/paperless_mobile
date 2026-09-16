@@ -140,6 +140,7 @@
     "prepQueue.label": "Label",
     "prepQueue.salesOrder": "Sales order",
     "prepQueue.prepare": "Prepare",
+    "prepQueue.directPrintMode": "Print without opening PDF",
     "prepQueue.openBom": "View BOM",
     "prepQueue.openBomError": "Failed to open BOM: {msg}",
     "prepQueue.refreshFoundNew": "{count} new items loaded.",

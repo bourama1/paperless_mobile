@@ -140,6 +140,7 @@
     "prepQueue.label": "Етикетка",
     "prepQueue.salesOrder": "Замовлення на продаж",
     "prepQueue.prepare": "Підготувати",
+    "prepQueue.directPrintMode": "Друкувати без відкриття PDF",
     "prepQueue.openBom": "Переглянути BOM",
     "prepQueue.openBomError": "Не вдалося відкрити BOM: {msg}",
     "prepQueue.refreshFoundNew": "Завантажено {count} нових позицій.",

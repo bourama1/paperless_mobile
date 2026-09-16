@@ -4,15 +4,14 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Appbar, Snackbar, Portal, Modal, Text, TextInput } from "react-native-paper";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { WebView, WebViewMessageEvent } from "react-native-webview";
-import { Ionicons } from "@expo/vector-icons";
 import { Asset } from "expo-asset";
-import { readAsStringAsync, writeAsStringAsync, cacheDirectory, EncodingType } from "expo-file-system/legacy";
-import * as Sharing from "expo-sharing";
+import { readAsStringAsync } from "expo-file-system/legacy";
 import apiClient, { BASE_URL, API_KEY } from "../../src/api/client";
 import { t } from "../../src/i18n";
 import { CompletionContext, CompletionStatus, CheckStatus, CycleCheck } from "../../src/types";
 import { useEmployees } from "../../src/hooks/useEmployees";
 import EmployeePicker from "../../src/components/EmployeePicker";
+import PrepLabelModal from "../../src/components/PrepLabelModal";
 
 interface DocumentMeta {
     project_number: string | null;
@@ -30,25 +29,6 @@ interface DocumentMeta {
 // Statuses that represent an order closed out without actually being
 // finished — the "Finish order" action only applies to these.
 const UNFINISHED_STATUSES: CompletionStatus[] = ["missing_product", "shipped_incomplete"];
-
-// Self-contained base64 encoder — avoids depending on btoa being polyfilled
-// in the RN/Hermes runtime, which isn't guaranteed.
-const BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
-    let result = "";
-    for (let i = 0; i < bytes.length; i += 3) {
-        const b1 = bytes[i]!;
-        const b2 = i + 1 < bytes.length ? bytes[i + 1]! : undefined;
-        const b3 = i + 2 < bytes.length ? bytes[i + 2]! : undefined;
-        const triplet = (b1 << 16) | ((b2 ?? 0) << 8) | (b3 ?? 0);
-        result += BASE64_CHARS[(triplet >> 18) & 0x3f];
-        result += BASE64_CHARS[(triplet >> 12) & 0x3f];
-        result += b2 !== undefined ? BASE64_CHARS[(triplet >> 6) & 0x3f] : "=";
-        result += b3 !== undefined ? BASE64_CHARS[triplet & 0x3f] : "=";
-    }
-    return result;
-}
 
 export default function DocumentViewerScreen() {
     const { id, filename, fromPrepQueue } = useLocalSearchParams();
@@ -137,122 +117,6 @@ export default function DocumentViewerScreen() {
     });
 
     const [labelPickerVisible, setLabelPickerVisible] = useState(false);
-    const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
-    const { data: employees } = useEmployees(labelPickerVisible);
-
-    const printLabel = useMutation({
-        mutationFn: async () => {
-            if (!docMeta?.project_number || !docMeta?.position || !selectedEmployee) return;
-            const response = await apiClient.post(
-                "/workstations/print-prep-label",
-                {
-                    projectNumber: docMeta.project_number,
-                    position: docMeta.position,
-                    employeeName: selectedEmployee,
-                    totalCycles: docMeta.total_cycles,
-                },
-                { responseType: "arraybuffer" },
-            );
-
-            // If the backend printed directly to the Godex, it returns
-            // {"success":true} — nothing more to do on the mobile side.
-            // If PREP_LABEL_PRINTER_HOST is not configured on the server it
-            // falls back to returning the raw PDF bytes so the worker can still
-            // send it somewhere manually (share sheet / dev testing).
-            const contentType = response.headers["content-type"] || "";
-            if (contentType.includes("application/json")) {
-                // Printer configured on backend — already printed, done.
-                return;
-            }
-
-            // Fallback: PDF bytes returned — open share sheet.
-            const filename = `label_${docMeta.project_number}_${docMeta.position}.pdf`;
-
-            if (Platform.OS === "web") {
-                const blob = new Blob([response.data], { type: "application/pdf" });
-                const url = URL.createObjectURL(blob);
-                window.open(url, "_blank");
-                setTimeout(() => URL.revokeObjectURL(url), 60000);
-                return;
-            }
-
-            const base64 = arrayBufferToBase64(response.data);
-            const fileUri = `${cacheDirectory}${filename}`;
-            await writeAsStringAsync(fileUri, base64, { encoding: EncodingType.Base64 });
-
-            if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(fileUri, {
-                    mimeType: "application/pdf",
-                    dialogTitle: t("document.printLabel"),
-                    UTI: "com.adobe.pdf",
-                });
-            } else {
-                throw new Error(t("document.sharingUnavailable"));
-            }
-        },
-        onSuccess: () => {
-            setLabelPickerVisible(false);
-            setSelectedEmployee(null);
-            setSnackbar({ visible: true, message: t("document.labelPrinted") });
-            // This action is only reachable from the prep queue (see
-            // canPrintLabel above) — printing here is what marks the item
-            // done (order_preparation_log), so drop it from that list now
-            // rather than waiting for the user to pull-to-refresh after
-            // navigating back.
-            queryClient.invalidateQueries({ queryKey: ["prep-queue"] });
-        },
-        onError: (error: any) => {
-            const msg = error?.response?.data?.error || error.message;
-            setSnackbar({ visible: true, message: t("document.labelPrintError", { msg }) });
-        },
-    });
-
-    // ── prep checklist (items P2L/PTL won't handle automatically) ──
-    // Same idea as motorOrderService's isNonPtlOrder check on the backend,
-    // but per item: an order's items that don't appear in parts.xlsx have
-    // to be physically prepared by hand, so the worker has to tap through
-    // all of them here before the print-label button unlocks below. Fetched
-    // only while the modal is open — most orders have nothing to check, so
-    // this stays fast, and there's no reason to fetch it before the worker
-    // has even opened the print flow.
-    const { data: prepChecklist, isLoading: prepChecklistLoading } = useQuery<{
-        items: { itemID: string; itemDesc: string; itemQuantity: number; unit: string; checked: boolean }[];
-        allPrepared: boolean;
-    }>({
-        queryKey: ["prep-items", docMeta?.project_number, docMeta?.position],
-        queryFn: async () => {
-            const response = await apiClient.get("/prep-queue/items", {
-                params: { projectNumber: docMeta!.project_number, position: docMeta!.position },
-            });
-            return response.data;
-        },
-        enabled: labelPickerVisible && canPrintLabel,
-    });
-    const prepItems = prepChecklist?.items ?? [];
-    // Fail safe while the checklist hasn't loaded yet (or errored): treat it
-    // as NOT fully prepared, never let a race let the print button through
-    // before we actually know what's still outstanding.
-    const prepAllChecked = prepChecklist?.allPrepared ?? false;
-
-    const checkPrepItem = useMutation({
-        mutationFn: async (item: { itemID: string; itemDesc: string }) => {
-            const response = await apiClient.post("/prep-queue/items/check", {
-                projectNumber: docMeta!.project_number,
-                position: docMeta!.position,
-                itemId: item.itemID,
-                itemDesc: item.itemDesc,
-                employeeName: selectedEmployee,
-            });
-            return response.data;
-        },
-        onSuccess: (data) => {
-            queryClient.setQueryData(["prep-items", docMeta?.project_number, docMeta?.position], data);
-        },
-        onError: (error: any) => {
-            const msg = error?.response?.data?.error || error.message;
-            setSnackbar({ visible: true, message: t("document.prepItemCheckError", { msg }) });
-        },
-    });
 
     // ── "Check" action (QC) ──
     // Records the third role on a cycle: who verified it's actually
@@ -464,94 +328,13 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
     }, []);
 
     const employeePickerModal = (
-        <Portal>
-            <Modal
-                visible={labelPickerVisible}
-                onDismiss={() => setLabelPickerVisible(false)}
-                contentContainerStyle={styles.modal}>
-                <Text variant="titleLarge" style={{ marginBottom: 4 }}>
-                    {t("document.printLabel")}
-                </Text>
-                <Text variant="bodyMedium" style={{ color: "#666", marginBottom: 16 }}>
-                    {t("document.printLabelHint")}
-                </Text>
-                <EmployeePicker
-                    employees={employees}
-                    selected={selectedEmployee}
-                    onSelect={setSelectedEmployee}
-                    style={{ marginBottom: 16 }}
-                />
-
-                {prepChecklistLoading && (
-                    <ActivityIndicator size="small" style={{ marginVertical: 12 }} />
-                )}
-
-                {prepItems.length > 0 && (
-                    <View style={{ marginTop: 16, marginBottom: 8 }}>
-                        <Text variant="titleSmall" style={{ marginBottom: 4 }}>
-                            {t("document.prepChecklistTitle")}
-                        </Text>
-                        <Text variant="bodySmall" style={{ color: "#666", marginBottom: 8 }}>
-                            {t("document.prepChecklistHint")}
-                        </Text>
-                        <ScrollView style={styles.prepChecklist}>
-                            {prepItems.map((item) => {
-                                const rowDisabled =
-                                    item.checked || !selectedEmployee || checkPrepItem.isPending;
-                                return (
-                                    <TouchableOpacity
-                                        key={item.itemID}
-                                        style={styles.prepChecklistRow}
-                                        activeOpacity={0.7}
-                                        disabled={rowDisabled}
-                                        onPress={() =>
-                                            checkPrepItem.mutate({
-                                                itemID: item.itemID,
-                                                itemDesc: item.itemDesc,
-                                            })
-                                        }>
-                                        <Ionicons
-                                            name={item.checked ? "checkbox" : "square-outline"}
-                                            size={22}
-                                            color={item.checked ? "#2e7d32" : "#909090"}
-                                        />
-                                        <View style={{ flex: 1, marginLeft: 10 }}>
-                                            <Text
-                                                variant="bodyMedium"
-                                                style={item.checked ? styles.prepItemTextChecked : undefined}>
-                                                {item.itemDesc || item.itemID}
-                                            </Text>
-                                            <Text variant="bodySmall" style={{ color: "#999" }}>
-                                                {item.itemID} · {item.itemQuantity} {item.unit}
-                                            </Text>
-                                        </View>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </ScrollView>
-                    </View>
-                )}
-
-                <TouchableOpacity
-                    style={[
-                        styles.confirmBtn,
-                        (!selectedEmployee ||
-                            printLabel.isPending ||
-                            prepChecklistLoading ||
-                            !prepAllChecked) &&
-                            styles.confirmBtnDisabled,
-                    ]}
-                    activeOpacity={0.8}
-                    disabled={
-                        !selectedEmployee || printLabel.isPending || prepChecklistLoading || !prepAllChecked
-                    }
-                    onPress={() => printLabel.mutate()}>
-                    {printLabel.isPending ?
-                        <ActivityIndicator size="small" color="#fff" />
-                    :   <Text style={styles.confirmBtnText}>{t("document.printLabelConfirm")}</Text>}
-                </TouchableOpacity>
-            </Modal>
-        </Portal>
+        <PrepLabelModal
+            visible={labelPickerVisible}
+            onDismiss={() => setLabelPickerVisible(false)}
+            projectNumber={docMeta?.project_number ?? ""}
+            position={docMeta?.position ?? ""}
+            totalCycles={docMeta?.total_cycles ?? 1}
+        />
     );
 
     const finishModal = (
@@ -913,21 +696,6 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         padding: 24,
     },
-    prepChecklist: {
-        maxHeight: 220,
-        borderWidth: 1,
-        borderColor: "#eee",
-        borderRadius: 8,
-    },
-    prepChecklistRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: "#f0f0f0",
-    },
-    prepItemTextChecked: { color: "#999", textDecorationLine: "line-through" },
     confirmBtn: {
         backgroundColor: "#ff5100",
         borderRadius: 10,
