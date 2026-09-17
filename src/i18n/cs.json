@@ -63,7 +63,7 @@
     "kiosk.submitError": "Nepodařilo se odeslat potvrzení",
     "kiosk.openDocument": "Otevřít dokument pro úpravy",
     "kiosk.openDocumentError": "Nepodařilo se otevřít dokument",
-    "kiosk.queueHint": "Ještě čeká {count} dalších zakázek",
+    "kiosk.queuePosition": "{index} z {total}",
     "search.selectType": "Vyberte typ dokumentu",
     "search.selectTypeHint": "Pro tuto pozici je k dispozici více dokumentů",
     "search.typesError": "Nepodařilo se načíst dostupné typy dokumentů",

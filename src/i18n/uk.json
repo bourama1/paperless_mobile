@@ -63,7 +63,7 @@
     "kiosk.submitError": "Не вдалося надіслати підтвердження",
     "kiosk.openDocument": "Відкрити документ для редагування",
     "kiosk.openDocumentError": "Не вдалося відкрити документ",
-    "kiosk.queueHint": "Ще очікує {count} замовлень",
+    "kiosk.queuePosition": "{index} з {total}",
     "search.selectType": "Виберіть тип документа",
     "search.selectTypeHint": "Для цієї позиції доступно декілька документів",
     "search.typesError": "Не вдалося завантажити доступні типи документів",

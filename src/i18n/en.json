@@ -63,7 +63,7 @@
     "kiosk.submitError": "Failed to submit confirmation",
     "kiosk.openDocument": "Open document for editing",
     "kiosk.openDocumentError": "Failed to open document",
-    "kiosk.queueHint": "{count} more orders waiting",
+    "kiosk.queuePosition": "{index} of {total}",
     "search.selectType": "Select document type",
     "search.selectTypeHint": "Multiple documents are available for this position",
     "search.typesError": "Failed to load available document types",

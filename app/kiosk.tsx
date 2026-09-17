@@ -33,6 +33,34 @@ interface OrderUpdatePayload {
     action: "STARTED" | "FINISHED";
 }
 
+// order_id + cycleIndex is the identity of a pending completion queue entry
+// throughout CompletionKiosk — the same pair the backend matches on for
+// order-completed and for the completion-queue backlog.
+function pendingKey(u: OrderUpdatePayload): string {
+    return `${u.order._id}::${u.cycleIndex}`;
+}
+
+// Merges incoming entries into the queue without duplicating one already
+// present — needed because an entry can arrive from two independent
+// sources (the live socket push and the completion-queue backlog fetch)
+// for the same order/cycle.
+function upsertPending(prev: OrderUpdatePayload[], incoming: OrderUpdatePayload[]): OrderUpdatePayload[] {
+    const seen = new Set(prev.map(pendingKey));
+    const merged = [...prev];
+    for (const item of incoming) {
+        const key = pendingKey(item);
+        if (!seen.has(key)) {
+            merged.push(item);
+            seen.add(key);
+        }
+    }
+    return merged;
+}
+
+function removePending(prev: OrderUpdatePayload[], orderId: string, cycleIndex: number): OrderUpdatePayload[] {
+    return prev.filter((p) => !(p.order._id === orderId && p.cycleIndex === cycleIndex));
+}
+
 type CompletionStatus = "complete" | "complete_with_changes" | "missing_product" | "shipped_incomplete";
 type KioskMode = "completion" | "status";
 
@@ -237,6 +265,9 @@ function CompletionKiosk({
 }) {
     const router = useRouter();
     const [pending, setPending] = useState<OrderUpdatePayload[]>([]);
+    // Which entry of the queue is currently being viewed — lets the worker
+    // browse with Prev/Next instead of only ever seeing the oldest one.
+    const [viewIndex, setViewIndex] = useState(0);
     const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
     const [selectedStatus, setSelectedStatus] = useState<CompletionStatus | null>(null);
     const [connected, setConnected] = useState(socket.connected);
@@ -245,9 +276,43 @@ function CompletionKiosk({
     const workstationRef = useRef(workstation);
     workstationRef.current = workstation;
 
-    const current = pending[0] ?? null;
+    // Clamped rather than reset on every change of `pending` — when an
+    // entry ahead of viewIndex is removed (completed, or completed on
+    // another tablet), whatever shifted into this slot is shown next,
+    // instead of always jumping back to the first entry.
+    const safeIndex = pending.length === 0 ? 0 : Math.min(viewIndex, pending.length - 1);
+    const current = pending[safeIndex] ?? null;
+    // Socket listeners below are registered once (empty deps, like the
+    // existing workstationRef pattern) so they need a ref to read the
+    // latest viewIndex rather than closing over a stale one.
+    const viewIndexRef = useRef(safeIndex);
+    viewIndexRef.current = safeIndex;
 
     const { data: employees } = useEmployees();
+
+    // The durable backlog (see completionService.getCompletionQueue) —
+    // fetched on mount so a tablet opening kiosk mode picks up anything
+    // that finished while no tablet had it open, not just what arrives
+    // live afterwards. Also gives us a manual refresh button for free.
+    const workplaceParam = workstation !== ANY_WORKPLACE ? workstation : undefined;
+    const {
+        data: queueData,
+        refetch: refetchQueue,
+        isRefetching: isRefetchingQueue,
+    } = useQuery<OrderUpdatePayload[]>({
+        queryKey: ["completion-queue", workplaceParam],
+        queryFn: async () => {
+            const response = await apiClient.get("/workstations/completion-queue", {
+                params: workplaceParam ? { workplace: workplaceParam } : {},
+            });
+            return response.data;
+        },
+    });
+
+    useEffect(() => {
+        if (!queueData) return;
+        setPending((prev) => upsertPending(prev, queueData));
+    }, [queueData]);
 
     useEffect(() => {
         const onConnect = () => setConnected(true);
@@ -268,7 +333,7 @@ function CompletionKiosk({
             // double-add them to the pending queue.
             if (FORCED_FINISH_WORKPLACES.has(update.order.workplace)) return;
             if (workstationRef.current !== ANY_WORKPLACE && update.order.workplace !== workstationRef.current) return;
-            setPending((prev) => [...prev, update]);
+            setPending((prev) => upsertPending(prev, [update]));
         };
         socket.on("workstation-order-update", onOrderUpdate);
         return () => {
@@ -285,14 +350,14 @@ function CompletionKiosk({
     useEffect(() => {
         const onOrderCompleted = ({ orderId, cycleIndex }: { orderId: string; cycleIndex?: number }) => {
             setPending((prev) => {
-                const wasCurrent = prev[0]?.order._id === orderId && prev[0]?.cycleIndex === cycleIndex;
-                const next = prev.filter((p) => !(p.order._id === orderId && p.cycleIndex === cycleIndex));
-                if (wasCurrent && next.length !== prev.length) {
+                const idx = prev.findIndex((p) => p.order._id === orderId && p.cycleIndex === cycleIndex);
+                if (idx === -1) return prev;
+                if (idx === viewIndexRef.current) {
                     setSelectedEmployee(null);
                     setSelectedStatus(null);
                     setSnackbar({ visible: true, message: t("kiosk.completedElsewhere") });
                 }
-                return next;
+                return prev.filter((_, i) => i !== idx);
             });
         };
         socket.on("order-completed", onOrderCompleted);
@@ -307,33 +372,41 @@ function CompletionKiosk({
     // remount of this kiosk doesn't re-show stale finishes.
     useEffect(() => {
         if (forcedFinishes.length === 0) return;
-        setPending((prev) => [...prev, ...forcedFinishes]);
+        setPending((prev) => upsertPending(prev, forcedFinishes));
         onForcedFinishesDrained();
     }, [forcedFinishes, onForcedFinishesDrained]);
 
     const submitCompletion = useMutation({
-        mutationFn: async () => {
-            if (!current || !selectedEmployee || !selectedStatus) return;
+        // Takes the target item explicitly (rather than reading `current`
+        // from closure) so that if the worker navigates to a different
+        // queue entry with Prev/Next while this request is still in
+        // flight, onSuccess below still removes the entry that was
+        // actually submitted — not whatever happens to be `current` by
+        // the time the response arrives.
+        mutationFn: async (item: OrderUpdatePayload) => {
+            if (!selectedEmployee || !selectedStatus) return;
             const res = await apiClient.post("/workstations/order-completion", {
-                orderId: current.order._id,
-                workstation: current.order.workplace,
-                cycleIndex: current.cycleIndex,
-                totalCycles: current.totalCycles,
-                productOrder: current.order.productOrder,
-                projectNumber: current.order.projectNumber,
-                position: current.order.position,
-                salesOrder: current.order.salesOrder,
+                orderId: item.order._id,
+                workstation: item.order.workplace,
+                cycleIndex: item.cycleIndex,
+                totalCycles: item.totalCycles,
+                productOrder: item.order.productOrder,
+                projectNumber: item.order.projectNumber,
+                position: item.order.position,
+                salesOrder: item.order.salesOrder,
                 employeeName: selectedEmployee,
                 status: selectedStatus,
                 // Quantity for ERP closing: Motor orders can finish multiple
                 // units at once (order.quantity > 1). Hardware and others
                 // are always 1 per completion call.
-                quantity: current.order.quantity ?? 1,
+                quantity: item.order.quantity ?? 1,
             });
-            return res.data;
+            return { data: res.data, item };
         },
-        onSuccess: (data) => {
-            setPending((prev) => prev.slice(1));
+        onSuccess: (result) => {
+            if (!result) return;
+            const { data, item } = result;
+            setPending((prev) => removePending(prev, item.order._id, item.cycleIndex));
             setSelectedEmployee(null);
             setSelectedStatus(null);
 
@@ -402,6 +475,11 @@ function CompletionKiosk({
                         {connected ? t("kiosk.connected") : t("kiosk.disconnected")}
                     </Text>
                 </View>
+                <TouchableOpacity onPress={() => refetchQueue()} disabled={isRefetchingQueue} style={{ padding: 4 }}>
+                    {isRefetchingQueue ?
+                        <ActivityIndicator size="small" color="#ff5100" />
+                    :   <Ionicons name="refresh" size={20} color="#ff5100" />}
+                </TouchableOpacity>
                 <LanguageSwitcher />
             </View>
 
@@ -419,6 +497,10 @@ function CompletionKiosk({
                 <Modal visible={!!current} dismissable={false} contentContainerStyle={styles.modal}>
                     {current && (
                         <>
+                            <TouchableOpacity onPress={onChangeWorkstation} style={styles.modalBackBtn}>
+                                <Ionicons name="arrow-back" size={18} color="#909090" />
+                                <Text style={styles.modalBackBtnText}>{t("kiosk.changeWorkstation")}</Text>
+                            </TouchableOpacity>
                             <Text variant="titleLarge" style={{ marginBottom: 4 }}>
                                 {t("kiosk.orderFinished")}
                             </Text>
@@ -497,16 +579,46 @@ function CompletionKiosk({
                                 ]}
                                 activeOpacity={0.8}
                                 disabled={!selectedEmployee || !selectedStatus || submitCompletion.isPending}
-                                onPress={() => submitCompletion.mutate()}>
+                                onPress={() => submitCompletion.mutate(current)}>
                                 {submitCompletion.isPending ?
                                     <ActivityIndicator size="small" color="#fff" />
                                 :   <Text style={styles.confirmBtnText}>{t("kiosk.confirm")}</Text>}
                             </TouchableOpacity>
 
                             {pending.length > 1 && (
-                                <Text style={styles.queueHint}>
-                                    {t("kiosk.queueHint", { count: pending.length - 1 })}
-                                </Text>
+                                <View style={styles.queueNav}>
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setViewIndex((i) => Math.max(0, i - 1));
+                                            setSelectedEmployee(null);
+                                            setSelectedStatus(null);
+                                        }}
+                                        disabled={safeIndex === 0 || submitCompletion.isPending}
+                                        style={styles.queueNavBtn}>
+                                        <Ionicons
+                                            name="chevron-back"
+                                            size={22}
+                                            color={safeIndex === 0 ? "#ccc" : "#ff5100"}
+                                        />
+                                    </TouchableOpacity>
+                                    <Text style={styles.queueNavText}>
+                                        {t("kiosk.queuePosition", { index: safeIndex + 1, total: pending.length })}
+                                    </Text>
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setViewIndex((i) => Math.min(pending.length - 1, i + 1));
+                                            setSelectedEmployee(null);
+                                            setSelectedStatus(null);
+                                        }}
+                                        disabled={safeIndex === pending.length - 1 || submitCompletion.isPending}
+                                        style={styles.queueNavBtn}>
+                                        <Ionicons
+                                            name="chevron-forward"
+                                            size={22}
+                                            color={safeIndex === pending.length - 1 ? "#ccc" : "#ff5100"}
+                                        />
+                                    </TouchableOpacity>
+                                </View>
                             )}
                         </>
                     )}
@@ -779,5 +891,15 @@ const styles = StyleSheet.create({
     },
     confirmBtnDisabled: { backgroundColor: "#f0c4a8" },
     confirmBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
-    queueHint: { textAlign: "center", color: "#909090", marginTop: 12, fontSize: 13 },
+    modalBackBtn: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+    modalBackBtnText: { color: "#909090", fontWeight: "600", marginLeft: 6 },
+    queueNav: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 16,
+        marginTop: 16,
+    },
+    queueNavBtn: { padding: 8 },
+    queueNavText: { color: "#909090", fontSize: 13, minWidth: 80, textAlign: "center" },
 });
