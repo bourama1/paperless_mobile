@@ -49,6 +49,8 @@
     "kiosk.waiting": "Очікування завершення замовлення…",
     "kiosk.orderFinished": "Замовлення завершено",
     "kiosk.orderMeta": "Вир. замовл. {productOrder} / позиція {position} — цикл {cycle}/{total}",
+    "kiosk.orderIdentifiers": "Замовлення {projectNumber} · Продажне замовлення {salesOrder}",
+    "kiosk.completedElsewhere": "Це замовлення вже завершено на іншому планшеті",
     "kiosk.whoFinished": "Хто завершив це замовлення?",
     "kiosk.selectEmployee": "Виберіть ім'я",
     "kiosk.noEmployees": "Немає доступних співробітників",

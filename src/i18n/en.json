@@ -49,6 +49,8 @@
     "kiosk.waiting": "Waiting for the order to finish…",
     "kiosk.orderFinished": "Order finished",
     "kiosk.orderMeta": "Prod. order {productOrder} / position {position} — cycle {cycle}/{total}",
+    "kiosk.orderIdentifiers": "Order {projectNumber} · Sales order {salesOrder}",
+    "kiosk.completedElsewhere": "This order was already completed on another tablet",
     "kiosk.whoFinished": "Who finished this order?",
     "kiosk.selectEmployee": "Select a name",
     "kiosk.noEmployees": "No employees are available",

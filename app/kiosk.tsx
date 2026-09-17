@@ -276,6 +276,31 @@ function CompletionKiosk({
         };
     }, []);
 
+    // Another kiosk tablet (a second physical location can run kiosk mode
+    // at the same time) just completed this exact order/cycle — drop it
+    // from our own queue too, so it can't be completed twice. Matched on
+    // orderId + cycleIndex (not just orderId) so a still-pending cycle of
+    // the same multi-cycle order isn't affected — applies to every
+    // workstation, not just Motor, since Hardware batches can span cycles too.
+    useEffect(() => {
+        const onOrderCompleted = ({ orderId, cycleIndex }: { orderId: string; cycleIndex?: number }) => {
+            setPending((prev) => {
+                const wasCurrent = prev[0]?.order._id === orderId && prev[0]?.cycleIndex === cycleIndex;
+                const next = prev.filter((p) => !(p.order._id === orderId && p.cycleIndex === cycleIndex));
+                if (wasCurrent && next.length !== prev.length) {
+                    setSelectedEmployee(null);
+                    setSelectedStatus(null);
+                    setSnackbar({ visible: true, message: t("kiosk.completedElsewhere") });
+                }
+                return next;
+            });
+        };
+        socket.on("order-completed", onOrderCompleted);
+        return () => {
+            socket.off("order-completed", onOrderCompleted);
+        };
+    }, []);
+
     // Drain forced finishes queued by KioskScreen into our pending queue.
     // They arrive after this kiosk mounts, so they can't go through the
     // socket listener above. The queue is cleared once merged so a later
@@ -403,6 +428,12 @@ function CompletionKiosk({
                                     position: current.order.position,
                                     cycle: current.cycleIndex,
                                     total: current.totalCycles,
+                                })}
+                            </Text>
+                            <Text variant="bodyMedium" style={styles.orderMeta}>
+                                {t("kiosk.orderIdentifiers", {
+                                    projectNumber: current.order.projectNumber,
+                                    salesOrder: current.order.salesOrder,
                                 })}
                             </Text>
                             <Text variant="bodyMedium" style={styles.orderMeta}>

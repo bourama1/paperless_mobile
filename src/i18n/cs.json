@@ -49,6 +49,8 @@
     "kiosk.waiting": "Čeká se na dokončení zakázky…",
     "kiosk.orderFinished": "Zakázka dokončena",
     "kiosk.orderMeta": "Výr. obj. {productOrder} / pozice {position} — cyklus {cycle}/{total}",
+    "kiosk.orderIdentifiers": "Zakázka {projectNumber} · Prodejní objednávka {salesOrder}",
+    "kiosk.completedElsewhere": "Tato zakázka již byla dokončena na jiném tabletu",
     "kiosk.whoFinished": "Kdo dokončil tuto zakázku?",
     "kiosk.selectEmployee": "Vyberte jméno",
     "kiosk.noEmployees": "Žádní zaměstnanci nejsou k dispozici",
