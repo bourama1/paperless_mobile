@@ -157,10 +157,22 @@ export default function DocumentViewerScreen() {
 
     const submitCheck = useMutation({
         mutationFn: async () => {
-            if (!docMeta?.project_number || !docMeta?.position || !checkSelectedEmployee || !selectedCycleIndex) return;
+            if (
+                !docMeta?.project_number ||
+                !docMeta?.position ||
+                !docMeta?.completion?.workstation ||
+                !checkSelectedEmployee ||
+                !selectedCycleIndex
+            )
+                return;
             await apiClient.post("/workstations/order-check", {
                 projectNumber: docMeta.project_number,
                 position: docMeta.position,
+                // The same position can be completed independently at more
+                // than one workplace (Hardware/Motor) — this keeps the
+                // check scoped to the one this document actually belongs
+                // to, instead of being conflated with another's.
+                workstation: docMeta.completion.workstation,
                 cycleIndex: selectedCycleIndex,
                 totalCycles: docMeta.total_cycles,
                 employeeName: checkSelectedEmployee,
