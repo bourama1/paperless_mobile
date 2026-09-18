@@ -102,6 +102,7 @@ export interface DocumentOverviewItem {
   // The workplace the order was completed at (order_completion_log.workstation)
   // — used to import the BOM on demand when document_id is null.
   workstation: string | null;
+  sales_order: string | null;
   document_type: number | null;
   created_at: string | null;
   updated_at: string | null;

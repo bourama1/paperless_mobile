@@ -243,16 +243,23 @@ function DocumentCard({ item, router }: { item: DocumentOverviewItem; router: Re
         <TouchableOpacity onPress={handlePress} activeOpacity={0.7} disabled={importing}>
             <Card style={styles.card} mode="outlined">
                 <Card.Title
-                    title={item.document_name || `${t("workstations.label.project")} ${item.project_number}`}
+                    // The identifying info (what this actually is) comes
+                    // first and is what the worker navigates by; the PDF's
+                    // own filename is secondary — see subtitle below.
+                    title={[
+                        item.project_number ? `${t("workstations.label.project")} ${item.project_number}` : null,
+                        item.sales_order ? `${t("workstations.label.salesOrder")} ${item.sales_order}` : null,
+                        item.position ? `${t("workstations.label.position")} ${item.position}` : null,
+                        item.workstation,
+                    ]
+                        .filter(Boolean)
+                        .join("  ·  ")}
                     titleStyle={styles.cardTitle}
+                    titleNumberOfLines={2}
                     subtitle={
-                        (item.project_number && item.position
-                            ? `${t("workstations.label.project")} ${item.project_number}  ·  ${t("workstations.label.position")} ${item.position}`
-                            : item.project_number
-                              ? `${t("workstations.label.project")} ${item.project_number}`
-                              : "") +
-                        (item.workstation ? `  ·  ${item.workstation}` : "") +
-                        `  ·  ${t("docs.completedAt")}: ${formatTime(item.completed_at)}`
+                        [item.document_name, `${t("docs.completedAt")}: ${formatTime(item.completed_at)}`]
+                            .filter(Boolean)
+                            .join("  ·  ")
                     }
                     right={() => (importing ? <ActivityIndicator size="small" style={{ marginRight: 12 }} /> : (
                         <View style={styles.chipRow}>
