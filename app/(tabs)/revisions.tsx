@@ -251,6 +251,7 @@ function DocumentCard({ item, router }: { item: DocumentOverviewItem; router: Re
                             : item.project_number
                               ? `${t("workstations.label.project")} ${item.project_number}`
                               : "") +
+                        (item.workstation ? `  ·  ${item.workstation}` : "") +
                         `  ·  ${t("docs.completedAt")}: ${formatTime(item.completed_at)}`
                     }
                     right={() => (importing ? <ActivityIndicator size="small" style={{ marginRight: 12 }} /> : (

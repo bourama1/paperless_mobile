@@ -65,6 +65,19 @@
             "detail": "Builds a plain .apk for directly installing on one tablet to test (adb install / file transfer), bypassing Play Store entirely. Fine for quick local testing even without release-signing env vars set (Android allows installing a debug-signed APK directly — only Play Console rejects it). Do NOT upload this file to Play Console."
         },
         {
+            "label": "Mobile: Zip Sideload APK for Teams",
+            "type": "shell",
+            "command": "$version = (Get-Content app.json -Raw | ConvertFrom-Json).expo.version; Compress-Archive -Path 'android\\app\\build\\outputs\\apk\\release\\app-release.apk' -DestinationPath \"android\\app\\build\\outputs\\apk\\release\\paperless-mobile-$version.zip\" -Force",
+            "options": {
+                "cwd": "${workspaceFolder}\\paperless_mobile"
+            },
+            "group": "build",
+            "dependsOn": ["Mobile: Build Sideload APK (local testing only — NOT for Play Store)"],
+            "dependsOrder": "sequence",
+            "problemMatcher": [],
+            "detail": "Builds the sideload APK (see dependsOn), then zips it as paperless-mobile-<version>.zip next to it in android/app/build/outputs/apk/release/ — Teams blocks .apk attachments but allows .zip, so this is what to actually send. Version comes straight from app.json's expo.version, so the filename always matches what just got built."
+        },
+        {
             "label": "Mobile: Export Web Build",
             "type": "shell",
             "command": "npx expo export --platform web",

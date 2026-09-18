@@ -273,9 +273,6 @@ function CompletionKiosk({
     const [connected, setConnected] = useState(socket.connected);
     const [snackbar, setSnackbar] = useState({ visible: false, message: "" });
 
-    const workstationRef = useRef(workstation);
-    workstationRef.current = workstation;
-
     // Clamped rather than reset on every change of `pending` — when an
     // entry ahead of viewIndex is removed (completed, or completed on
     // another tablet), whatever shifted into this slot is shown next,
@@ -333,21 +330,13 @@ function CompletionKiosk({
         };
     }, []);
 
-    useEffect(() => {
-        const onOrderUpdate = (update: OrderUpdatePayload) => {
-            if (update.action !== "FINISHED") return;
-            // Hardware/Motor finishes are owned by KioskScreen's forced queue
-            // (see FORCED_FINISH_WORKPLACES) — handling them here too would
-            // double-add them to the pending queue.
-            if (FORCED_FINISH_WORKPLACES.has(update.order.workplace)) return;
-            if (workstationRef.current !== ANY_WORKPLACE && update.order.workplace !== workstationRef.current) return;
-            setPending((prev) => upsertPending(prev, [update]));
-        };
-        socket.on("workstation-order-update", onOrderUpdate);
-        return () => {
-            socket.off("workstation-order-update", onOrderUpdate);
-        };
-    }, []);
+    // No direct "workstation-order-update" listener here for non-Hardware/
+    // Motor finishes: only Hardware and Motor ever go through completion
+    // (see the backend's COMPLETION_KIOSK_WORKPLACES and this file's
+    // FORCED_FINISH_WORKPLACES), and those are already fully covered by
+    // KioskScreen's forced-finish queue below plus the durable backlog
+    // fetch above — a live event for anything else is simply not wanted
+    // here anymore.
 
     // Another kiosk tablet (a second physical location can run kiosk mode
     // at the same time) just completed this exact order/cycle — drop it
