@@ -287,6 +287,14 @@ function CompletionKiosk({
     // latest viewIndex rather than closing over a stale one.
     const viewIndexRef = useRef(safeIndex);
     viewIndexRef.current = safeIndex;
+    // io.emit broadcasts order-completed to every connected tablet,
+    // including whichever one just submitted the completion (it arrived
+    // over plain HTTP, not that tablet's own socket connection, so the
+    // server has no "sender" to exclude). If that broadcast round-trips
+    // back here before our own request's response does, this ref lets
+    // onOrderCompleted recognize "that's the thing I'm submitting myself"
+    // and skip the "completed elsewhere" snackbar for it.
+    const submittingRef = useRef<{ orderId: string; cycleIndex: number } | null>(null);
 
     const { data: employees } = useEmployees();
 
@@ -352,7 +360,9 @@ function CompletionKiosk({
             setPending((prev) => {
                 const idx = prev.findIndex((p) => p.order._id === orderId && p.cycleIndex === cycleIndex);
                 if (idx === -1) return prev;
-                if (idx === viewIndexRef.current) {
+                const isOwnSubmission =
+                    submittingRef.current?.orderId === orderId && submittingRef.current?.cycleIndex === cycleIndex;
+                if (idx === viewIndexRef.current && !isOwnSubmission) {
                     setSelectedEmployee(null);
                     setSelectedStatus(null);
                     setSnackbar({ visible: true, message: t("kiosk.completedElsewhere") });
@@ -428,6 +438,14 @@ function CompletionKiosk({
             setSnackbar({ visible: true, message: t("kiosk.submitError") });
         },
     });
+
+    submittingRef.current =
+        submitCompletion.isPending && submitCompletion.variables
+            ? {
+                  orderId: submitCompletion.variables.order._id,
+                  cycleIndex: submitCompletion.variables.cycleIndex,
+              }
+            : null;
 
     // Lets the operator open the order's document one last time from inside
     // the finishing modal, for a final edit/check before confirming — e.g.
