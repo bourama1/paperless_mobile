@@ -2,7 +2,7 @@
     "expo": {
         "name": "paperless_mobile",
         "slug": "paperless_mobile",
-        "version": "1.0.6",
+        "version": "1.0.8",
         "orientation": "portrait",
         "icon": "./assets/icon.png",
         "userInterfaceStyle": "light",
@@ -18,7 +18,7 @@
         },
         "android": {
             "package": "com.bourama1.paperless_mobile",
-            "versionCode": 10006,
+            "versionCode": 10008,
             "adaptiveIcon": {
                 "foregroundImage": "./assets/adaptive-icon.png",
                 "backgroundColor": "#ffffff"

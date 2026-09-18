@@ -67,7 +67,7 @@
         {
             "label": "Mobile: Zip Sideload APK for Teams",
             "type": "shell",
-            "command": "$version = (Get-Content app.json -Raw | ConvertFrom-Json).expo.version; Compress-Archive -Path 'android\\app\\build\\outputs\\apk\\release\\app-release.apk' -DestinationPath \"android\\app\\build\\outputs\\apk\\release\\paperless-mobile-$version.zip\" -Force",
+            "command": "$version = (Get-Content app.json -Raw | ConvertFrom-Json).expo.version; $apk = 'android\\app\\build\\outputs\\apk\\release\\paperless-mobile-' + $version + '.apk'; $zip = 'android\\app\\build\\outputs\\apk\\release\\paperless-mobile-' + $version + '.zip'; Copy-Item 'android\\app\\build\\outputs\\apk\\release\\app-release.apk' $apk -Force; Compress-Archive -Path $apk -DestinationPath $zip -Force",
             "options": {
                 "cwd": "${workspaceFolder}\\paperless_mobile"
             },
@@ -75,7 +75,7 @@
             "dependsOn": ["Mobile: Build Sideload APK (local testing only — NOT for Play Store)"],
             "dependsOrder": "sequence",
             "problemMatcher": [],
-            "detail": "Builds the sideload APK (see dependsOn), then zips it as paperless-mobile-<version>.zip next to it in android/app/build/outputs/apk/release/ — Teams blocks .apk attachments but allows .zip, so this is what to actually send. Version comes straight from app.json's expo.version, so the filename always matches what just got built."
+            "detail": "Builds the sideload APK (see dependsOn), copies it to paperless-mobile-<version>.apk, then zips that copy as paperless-mobile-<version>.zip — both land next to the original app-release.apk in android/app/build/outputs/apk/release/. Teams blocks .apk attachments but allows .zip, so the zip is what to actually send; the renamed .apk is there too for adb install / anyone who can take a raw APK. Version comes straight from app.json's expo.version, so both filenames always match what just got built."
         },
         {
             "label": "Mobile: Export Web Build",
