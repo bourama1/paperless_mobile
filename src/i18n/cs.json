@@ -83,6 +83,7 @@
     "document.editorError": "Nepodařilo se otevřít editor",
     "document.saving": "Ukládání změn...",
     "document.saved": "Změny uloženy.",
+    "document.retrySave": "Zkusit znovu",
     "document.editing": "Úpravy...",
     "document.iframeTitle": "PDF Editor",
     "document.viewerLoading": "Načítání PDF...",

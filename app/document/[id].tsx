@@ -12,6 +12,7 @@ import { CompletionContext, CompletionStatus, CheckStatus, CycleCheck } from "..
 import { useEmployees } from "../../src/hooks/useEmployees";
 import EmployeePicker from "../../src/components/EmployeePicker";
 import PrepLabelModal from "../../src/components/PrepLabelModal";
+import { saveEditedPdfWithRetry, PendingSave } from "../../src/utils/saveEditedPdf";
 
 interface DocumentMeta {
     project_number: string | null;
@@ -41,6 +42,29 @@ export default function DocumentViewerScreen() {
     const [editSrc, setEditSrc] = useState<string | null>(null);
     const [editHtml, setEditHtml] = useState<string | null>(null);
     const blobUrlRef = useRef<string | null>(null);
+    // Set when a save fails after exhausting all retries — keeps the
+    // edited PDF bytes around so the worker can retry from the snackbar
+    // instead of losing the edit and having to redo it from scratch.
+    const [pendingSave, setPendingSave] = useState<PendingSave | null>(null);
+
+    const retrySave = useCallback(async () => {
+        if (!pendingSave) return;
+        setSnackbar({ visible: true, message: t("document.saving") });
+        try {
+            await saveEditedPdfWithRetry(pendingSave);
+            setPendingSave(null);
+            setSnackbar({ visible: true, message: t("document.saved") });
+            setRefreshKey((k) => k + 1);
+            setMode("view");
+            setEditSrc(null);
+            setEditHtml(null);
+        } catch (err: any) {
+            setSnackbar({
+                visible: true,
+                message: err?.response?.data?.error || err?.message || t("document.editorError"),
+            });
+        }
+    }, [pendingSave]);
 
     // ── prep-station "print label" action ──
     // Needs this document's projectNumber/position, which the route params
@@ -273,15 +297,17 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
             if (e.data?.type !== "SAVED") return;
             const pdfBase64 = e.data.pdfBase64;
             if (pdfBase64) {
+                const save: PendingSave = {
+                    documentId: Number(id),
+                    pdfBase64,
+                    filename: e.data.fileName || filename,
+                };
                 setSnackbar({ visible: true, message: t("document.saving") });
                 try {
-                    await apiClient.post("/workstations/save-edited", {
-                        documentId: Number(id),
-                        pdfBase64,
-                        filename: e.data.fileName || filename,
-                    });
+                    await saveEditedPdfWithRetry(save);
                     setSnackbar({ visible: true, message: t("document.saved") });
                 } catch (err: any) {
+                    setPendingSave(save);
                     setSnackbar({
                         visible: true,
                         message: err?.response?.data?.error || err?.message || t("document.editorError"),
@@ -306,15 +332,17 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                 const msg = JSON.parse(event.nativeEvent.data);
                 if (msg.type === "SAVED") {
                     if (msg.pdfBase64) {
+                        const save: PendingSave = {
+                            documentId: Number(id),
+                            pdfBase64: msg.pdfBase64,
+                            filename: msg.fileName || filename,
+                        };
                         setSnackbar({ visible: true, message: t("document.saving") });
                         try {
-                            await apiClient.post("/workstations/save-edited", {
-                                documentId: Number(id),
-                                pdfBase64: msg.pdfBase64,
-                                filename: msg.fileName || filename,
-                            });
+                            await saveEditedPdfWithRetry(save);
                             setSnackbar({ visible: true, message: t("document.saved") });
                         } catch (err: any) {
+                            setPendingSave(save);
                             setSnackbar({
                                 visible: true,
                                 message: err?.response?.data?.error || err?.message || t("document.editorError"),
@@ -551,7 +579,11 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                         <ActivityIndicator size="large" color="#fff" />
                     </View>
                 )}
-                <Snackbar visible={snackbar.visible} onDismiss={() => setSnackbar({ ...snackbar, visible: false })}>
+                <Snackbar
+                    visible={snackbar.visible}
+                    onDismiss={() => setSnackbar({ ...snackbar, visible: false })}
+                    duration={pendingSave ? 15000 : 4000}
+                    action={pendingSave ? { label: t("document.retrySave"), onPress: retrySave } : undefined}>
                     {snackbar.message}
                 </Snackbar>
                 {employeePickerModal}
@@ -624,7 +656,11 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                 )}
             </View>
 
-            <Snackbar visible={snackbar.visible} onDismiss={() => setSnackbar({ ...snackbar, visible: false })}>
+            <Snackbar
+                visible={snackbar.visible}
+                onDismiss={() => setSnackbar({ ...snackbar, visible: false })}
+                duration={pendingSave ? 15000 : 4000}
+                action={pendingSave ? { label: t("document.retrySave"), onPress: retrySave } : undefined}>
                 {snackbar.message}
             </Snackbar>
             {employeePickerModal}

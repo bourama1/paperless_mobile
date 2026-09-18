@@ -83,6 +83,7 @@
     "document.editorError": "Failed to open the editor",
     "document.saving": "Saving changes...",
     "document.saved": "Changes saved.",
+    "document.retrySave": "Retry",
     "document.editing": "Editing...",
     "document.iframeTitle": "PDF Editor",
     "document.viewerLoading": "Loading PDF...",

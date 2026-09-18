@@ -83,6 +83,7 @@
     "document.editorError": "Не вдалося відкрити редактор",
     "document.saving": "Збереження змін...",
     "document.saved": "Зміни збережено.",
+    "document.retrySave": "Повторити",
     "document.editing": "Редагування...",
     "document.iframeTitle": "PDF редактор",
     "document.viewerLoading": "Завантаження PDF...",
