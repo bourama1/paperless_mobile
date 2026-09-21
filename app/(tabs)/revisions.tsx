@@ -18,6 +18,9 @@ import PbomTypePickerModal from "../../src/components/PbomTypePickerModal";
 // shifting displayed times away from the real (correct, UTC-stored) value.
 const FACTORY_TIME_ZONE = "Europe/Prague";
 
+// How often the Docs tab silently refreshes while someone is looking at it.
+const DOCS_POLL_INTERVAL_MS = 10_000;
+
 function formatTime(iso: string): string {
     return new Date(iso).toLocaleString("cs-CZ", {
         timeZone: FACTORY_TIME_ZONE,
@@ -52,14 +55,19 @@ export default function DocumentsScreen() {
 
     const statusParam = Array.from(statusFilters).join(",");
 
+    // Only poll while this tab is actually on screen — bottom tabs stay
+    // mounted when unfocused, so without this it would keep hitting the
+    // backend every interval from the background.
+    const [isFocused, setIsFocused] = useState(false);
+
     const {
         data: overview,
         isLoading,
         isError,
         refetch,
-        isRefetching,
     } = useQuery<DocumentsOverviewResponse>({
         queryKey: ["documents-overview", statusParam, revisionedOnly, uncheckedOnly],
+        refetchInterval: isFocused ? DOCS_POLL_INTERVAL_MS : false,
         queryFn: async () => {
             const response = await apiClient.get("/files", {
                 params: {
@@ -72,11 +80,28 @@ export default function DocumentsScreen() {
         },
     });
 
+    // Refetch on every return to this tab (e.g. after closing an opened
+    // document) and mark it focused so the interval above runs.
     useFocusEffect(
         useCallback(() => {
+            setIsFocused(true);
             refetch();
+            return () => setIsFocused(false);
         }, [refetch]),
     );
+
+    // Spinner state for the header icon / pull-to-refresh is tied to
+    // explicit user refreshes only — the silent 10s poll and the on-focus
+    // refetch shouldn't flash a spinner every time.
+    const [manualRefreshing, setManualRefreshing] = useState(false);
+    const manualRefetch = useCallback(async () => {
+        setManualRefreshing(true);
+        try {
+            await refetch();
+        } finally {
+            setManualRefreshing(false);
+        }
+    }, [refetch]);
 
     useLayoutEffect(() => {
         navigation.setOptions({
@@ -85,8 +110,8 @@ export default function DocumentsScreen() {
                     <TouchableOpacity onPress={order.scanner.open} style={{ marginRight: 16 }}>
                         <Ionicons name="barcode-outline" size={22} color="#ff5100" />
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => refetch()} disabled={isRefetching} style={{ marginRight: 16 }}>
-                        {isRefetching ?
+                    <TouchableOpacity onPress={manualRefetch} disabled={manualRefreshing} style={{ marginRight: 16 }}>
+                        {manualRefreshing ?
                             <ActivityIndicator size="small" color="#ff5100" />
                         :   <Ionicons name="refresh" size={22} color="#ff5100" />}
                     </TouchableOpacity>
@@ -94,7 +119,7 @@ export default function DocumentsScreen() {
                 </View>
             ),
         });
-    }, [navigation, refetch, isRefetching, order.scanner.open]);
+    }, [navigation, manualRefetch, manualRefreshing, order.scanner.open]);
 
     const toggleStatus = (value: CompletionStatus) => {
         setStatusFilters((prev) => {
@@ -140,7 +165,7 @@ export default function DocumentsScreen() {
             </View>
             <Divider />
 
-            {isLoading && !isRefetching ?
+            {isLoading ?
                 <View style={styles.center}>
                     <ActivityIndicator size="large" />
                 </View>
@@ -162,8 +187,8 @@ export default function DocumentsScreen() {
                             ? item.document_id.toString()
                             : `${item.project_number}-${item.position}`
                     }
-                    onRefresh={refetch}
-                    refreshing={isRefetching}
+                    onRefresh={manualRefetch}
+                    refreshing={manualRefreshing}
                     contentContainerStyle={styles.list}
                     renderItem={({ item }) => <DocumentCard item={item} router={router} />}
                 />
