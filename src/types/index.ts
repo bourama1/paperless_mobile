@@ -90,6 +90,10 @@ export interface CycleCheck {
   employeeName: string | null;
   note: string | null;
   checkedAt: string | null;
+  // Who completed this cycle at the completion kiosk (same workstation as
+  // the document) — shown to the checker so they know who to ask.
+  completedBy?: string | null;
+  completedAt?: string | null;
 }
 
 export interface DocumentOverviewItem {

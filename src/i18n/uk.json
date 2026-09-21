@@ -132,6 +132,7 @@
     "document.checkTitle": "Перевірка замовлення",
     "document.checkHint": "Виберіть цикл (упаковку), яку ви перевіряєте.",
     "document.checkCycleLabel": "Перевірено {checked}/{total} циклів",
+    "document.checkCompletedBy": "Завершив(-ла): {name}",
     "document.checkLastOk": "Востаннє перевірив: {name} (ОК)",
     "document.checkLastIssue": "Востаннє повідомив про проблему: {name}",
     "document.checkStatusOk": "ОК",

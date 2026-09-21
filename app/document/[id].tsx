@@ -453,14 +453,23 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                 </ScrollView>
                 {(() => {
                     const selected = docMeta?.cycles?.find((c) => c.cycleIndex === selectedCycleIndex);
-                    if (!selected?.checkedAt) return null;
+                    if (!selected) return null;
                     return (
-                        <Text variant="bodySmall" style={{ color: "#666", marginBottom: 12 }}>
-                            {t(selected.status === "ok" ? "document.checkLastOk" : "document.checkLastIssue", {
-                                name: selected.employeeName ?? "",
-                            })}
-                            {selected.note ? ` — ${selected.note}` : ""}
-                        </Text>
+                        <View style={{ marginBottom: 12 }}>
+                            {selected.completedBy ? (
+                                <Text variant="bodyMedium" style={{ color: "#333", fontWeight: "600", marginBottom: 4 }}>
+                                    {t("document.checkCompletedBy", { name: selected.completedBy })}
+                                </Text>
+                            ) : null}
+                            {selected.checkedAt ? (
+                                <Text variant="bodySmall" style={{ color: "#666" }}>
+                                    {t(selected.status === "ok" ? "document.checkLastOk" : "document.checkLastIssue", {
+                                        name: selected.employeeName ?? "",
+                                    })}
+                                    {selected.note ? ` — ${selected.note}` : ""}
+                                </Text>
+                            ) : null}
+                        </View>
                     );
                 })()}
 

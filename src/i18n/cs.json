@@ -132,6 +132,7 @@
     "document.checkTitle": "Kontrola zakázky",
     "document.checkHint": "Vyberte cyklus (balení), který kontrolujete.",
     "document.checkCycleLabel": "Zkontrolováno {checked}/{total} cyklů",
+    "document.checkCompletedBy": "Dokončil(a): {name}",
     "document.checkLastOk": "Naposledy zkontroloval: {name} (v pořádku)",
     "document.checkLastIssue": "Naposledy nahlásil problém: {name}",
     "document.checkStatusOk": "V pořádku",

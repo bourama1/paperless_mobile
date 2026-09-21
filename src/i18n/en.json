@@ -132,6 +132,7 @@
     "document.checkTitle": "Order check",
     "document.checkHint": "Select the cycle (package) you are checking.",
     "document.checkCycleLabel": "Checked {checked}/{total} cycles",
+    "document.checkCompletedBy": "Completed by: {name}",
     "document.checkLastOk": "Last checked by: {name} (OK)",
     "document.checkLastIssue": "Last reported an issue: {name}",
     "document.checkStatusOk": "OK",
