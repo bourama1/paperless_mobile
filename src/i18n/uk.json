@@ -174,7 +174,7 @@
     "kiosk.toorsError": "Не вдалося додати закриття в ERP до черги: {error}",
     "stats.tabTitle": "Статистика",
     "stats.total": "Всього: {count}",
-    "stats.empty": "За цей тиждень нічого не знайдено.",
+    "stats.empty": "За цей день нічого не знайдено.",
     "stats.stageCompleted": "Завершено",
     "stats.stageChecked": "Перевірено",
     "stats.error": "Не вдалося завантажити статистику"

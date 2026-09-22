@@ -174,7 +174,7 @@
     "kiosk.toorsError": "Nepodařilo se zařadit uzavření v ERP do fronty: {error}",
     "stats.tabTitle": "Statistiky",
     "stats.total": "Celkem: {count}",
-    "stats.empty": "Za tento týden zatím nic nebylo nalezeno.",
+    "stats.empty": "Pro tento den zatím nic nebylo nalezeno.",
     "stats.stageCompleted": "Dokončeno",
     "stats.stageChecked": "Zkontrolováno",
     "stats.error": "Nepodařilo se načíst statistiky"

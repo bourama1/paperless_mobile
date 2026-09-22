@@ -174,7 +174,7 @@
     "kiosk.toorsError": "Failed to queue ERP close: {error}",
     "stats.tabTitle": "Stats",
     "stats.total": "Total: {count}",
-    "stats.empty": "Nothing found this week.",
+    "stats.empty": "Nothing found for this day.",
     "stats.stageCompleted": "Completed",
     "stats.stageChecked": "Checked",
     "stats.error": "Failed to load statistics"

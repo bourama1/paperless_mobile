@@ -22,31 +22,28 @@ function addDays(d: Date, n: number): Date {
     return r;
 }
 
-// Monday of the week containing `d` (getDay(): 0=Sun..6=Sat).
-function mondayOf(d: Date): Date {
-    const day = d.getDay();
-    return addDays(d, day === 0 ? -6 : 1 - day);
-}
-
-function formatShort(d: Date): string {
-    return d.toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric" });
+function formatDay(d: Date): string {
+    return d.toLocaleDateString("cs-CZ", {
+        weekday: "short",
+        day: "numeric",
+        month: "numeric",
+        year: "numeric",
+    });
 }
 
 export default function StatsScreen() {
-    // 0 = this week, -1 = last week, etc. Never lets you page into the future.
-    const [weekOffset, setWeekOffset] = useState(0);
+    // 0 = today, -1 = yesterday, etc. Never lets you page into the future.
+    const [dayOffset, setDayOffset] = useState(0);
     // "checked" by default — a cycle that finished but was never QC-checked
     // isn't really done yet, so that's the more meaningful default count.
     const [stage, setStage] = useState<Stage>("checked");
-    const monday = addDays(mondayOf(new Date()), weekOffset * 7);
-    const sunday = addDays(monday, 6);
-    const from = dateKey(monday);
-    const to = dateKey(sunday);
+    const day = addDays(new Date(), dayOffset);
+    const from = dateKey(day);
+    const to = from;
 
     const { data, isLoading, isError, refetch, isRefetching } = useQuery<ProductStat[]>({
         queryKey: ["stats", from, to, stage],
-        queryFn: async () =>
-            (await apiClient.get("/workstations/stats", { params: { from, to, stage } })).data,
+        queryFn: async () => (await apiClient.get("/workstations/stats", { params: { from, to, stage } })).data,
     });
 
     // Refetch every time this tab comes into view — the count changes
@@ -60,16 +57,14 @@ export default function StatsScreen() {
 
     const total = data?.reduce((sum, s) => sum + s.count, 0) ?? 0;
 
-    const weekNav = (
-        <View style={styles.weekNav}>
-            <IconButton icon="chevron-left" onPress={() => setWeekOffset((w) => w - 1)} />
-            <Text variant="titleMedium">
-                {formatShort(monday)} – {formatShort(sunday)}
-            </Text>
+    const dayNav = (
+        <View style={styles.dayNav}>
+            <IconButton icon="chevron-left" onPress={() => setDayOffset((d) => d - 1)} />
+            <Text variant="titleMedium">{formatDay(day)}</Text>
             <IconButton
                 icon="chevron-right"
-                disabled={weekOffset >= 0}
-                onPress={() => setWeekOffset((w) => Math.min(0, w + 1))}
+                disabled={dayOffset >= 0}
+                onPress={() => setDayOffset((d) => Math.min(0, d + 1))}
             />
         </View>
     );
@@ -98,7 +93,7 @@ export default function StatsScreen() {
             refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
             ListHeaderComponent={
                 <>
-                    {weekNav}
+                    {dayNav}
                     <SegmentedButtons
                         value={stage}
                         onValueChange={(v) => setStage(v as Stage)}
@@ -137,7 +132,7 @@ export default function StatsScreen() {
 const styles = StyleSheet.create({
     center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
     list: { padding: 12, flexGrow: 1 },
-    weekNav: { flexDirection: "row", alignItems: "center", justifyContent: "center" },
+    dayNav: { flexDirection: "row", alignItems: "center", justifyContent: "center" },
     stageToggle: { marginBottom: 12 },
     total: { marginBottom: 12, marginLeft: 4, textAlign: "center" },
     card: { marginBottom: 8 },
