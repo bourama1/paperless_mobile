@@ -117,6 +117,7 @@
     "scan.error": "Čárový kód se nepodařilo vyhodnotit",
     "document.printLabel": "Tisk štítku",
     "document.printLabelHint": "Kdo připravuje tuto zakázku?",
+    "document.printLabelDoorCount": "Počet vrat: {count} — vytiskne se {count} štítků, připravte {count} samostatných krabic.",
     "document.printLabelConfirm": "Vytisknout štítek",
     "document.prepChecklistTitle": "Položky k přípravě",
     "document.prepChecklistHint": "Klepněte na položku, jakmile ji připravíte",
@@ -170,5 +171,11 @@
     "workstations.label.salesOrder": "Prod. obj.:",
     "workstations.label.productOrder": "Výr. obj.:",
     "kiosk.toorsQueued": "Výrobní zakázka zařazena do fronty k uzavření v ERP",
-    "kiosk.toorsError": "Nepodařilo se zařadit uzavření v ERP do fronty: {error}"
+    "kiosk.toorsError": "Nepodařilo se zařadit uzavření v ERP do fronty: {error}",
+    "stats.tabTitle": "Statistiky",
+    "stats.total": "Celkem: {count}",
+    "stats.empty": "Za tento týden zatím nic nebylo nalezeno.",
+    "stats.stageCompleted": "Dokončeno",
+    "stats.stageChecked": "Zkontrolováno",
+    "stats.error": "Nepodařilo se načíst statistiky"
 }

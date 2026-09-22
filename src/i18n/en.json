@@ -117,6 +117,7 @@
     "scan.error": "Could not resolve this barcode",
     "document.printLabel": "Print label",
     "document.printLabelHint": "Who is preparing this order?",
+    "document.printLabelDoorCount": "{count} doors — {count} labels will print, prepare {count} separate boxes.",
     "document.printLabelConfirm": "Print label",
     "document.prepChecklistTitle": "Items to prepare",
     "document.prepChecklistHint": "Tap each item once you've prepared it",
@@ -170,5 +171,11 @@
     "workstations.label.salesOrder": "Sales order:",
     "workstations.label.productOrder": "Prod. order:",
     "kiosk.toorsQueued": "Production order queued for closing in ERP",
-    "kiosk.toorsError": "Failed to queue ERP close: {error}"
+    "kiosk.toorsError": "Failed to queue ERP close: {error}",
+    "stats.tabTitle": "Stats",
+    "stats.total": "Total: {count}",
+    "stats.empty": "Nothing found this week.",
+    "stats.stageCompleted": "Completed",
+    "stats.stageChecked": "Checked",
+    "stats.error": "Failed to load statistics"
 }

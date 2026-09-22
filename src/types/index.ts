@@ -126,3 +126,8 @@ export interface DocumentOverviewItem {
 export interface DocumentsOverviewResponse {
   items: DocumentOverviewItem[];
 }
+
+export interface ProductStat {
+  productDesc: string;
+  count: number;
+}

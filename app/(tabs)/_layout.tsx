@@ -46,6 +46,13 @@ export default function TabLayout() {
                     tabBarIcon: ({ color, size }) => <Ionicons name="cube-outline" size={size} color={color} />,
                 }}
             />
+            <Tabs.Screen
+                name="stats"
+                options={{
+                    title: t("stats.tabTitle"),
+                    tabBarIcon: ({ color, size }) => <Ionicons name="stats-chart" size={size} color={color} />,
+                }}
+            />
         </Tabs>
     );
 }

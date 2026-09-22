@@ -117,6 +117,7 @@
     "scan.error": "Не вдалося розпізнати штрих-код",
     "document.printLabel": "Друк етикетки",
     "document.printLabelHint": "Хто готує це замовлення?",
+    "document.printLabelDoorCount": "Кількість воріт: {count} — буде надруковано {count} етикеток, підготуйте {count} окремі коробки.",
     "document.printLabelConfirm": "Надрукувати етикетку",
     "document.prepChecklistTitle": "Елементи для підготовки",
     "document.prepChecklistHint": "Торкніться елемента, щойно його підготуєте",
@@ -170,5 +171,11 @@
     "workstations.label.salesOrder": "Замовлення на продаж:",
     "workstations.label.productOrder": "Вир. замовл.:",
     "kiosk.toorsQueued": "Виробниче замовлення додано в чергу для закриття в ERP",
-    "kiosk.toorsError": "Не вдалося додати закриття в ERP до черги: {error}"
+    "kiosk.toorsError": "Не вдалося додати закриття в ERP до черги: {error}",
+    "stats.tabTitle": "Статистика",
+    "stats.total": "Всього: {count}",
+    "stats.empty": "За цей тиждень нічого не знайдено.",
+    "stats.stageCompleted": "Завершено",
+    "stats.stageChecked": "Перевірено",
+    "stats.error": "Не вдалося завантажити статистику"
 }
