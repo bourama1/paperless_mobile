@@ -186,6 +186,11 @@ export default function PrepLabelModal({
                     <Text variant="bodyMedium" style={{ color: "#666", marginBottom: 16 }}>
                         {t("document.printLabelHint")}
                     </Text>
+                    {totalCycles > 1 && (
+                        <Text variant="bodyMedium" style={styles.doorCount}>
+                            {t("document.printLabelDoorCount", { count: totalCycles })}
+                        </Text>
+                    )}
                     {prepChecklistLoading && <ActivityIndicator size="small" style={{ marginVertical: 12 }} />}
 
                     {prepItems.length > 0 && (
@@ -268,6 +273,11 @@ export default function PrepLabelModal({
 }
 
 const styles = StyleSheet.create({
+    doorCount: {
+        color: "#ff5100",
+        fontWeight: "bold",
+        marginBottom: 16,
+    },
     modal: {
         backgroundColor: "#fff",
         marginHorizontal: 24,
