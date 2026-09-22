@@ -177,5 +177,16 @@
     "stats.empty": "За цей день нічого не знайдено.",
     "stats.stageCompleted": "Завершено",
     "stats.stageChecked": "Перевірено",
-    "stats.error": "Не вдалося завантажити статистику"
+    "stats.adminPinTitle": "Введіть PIN",
+    "stats.adminUnlock": "Розблокувати",
+    "stats.adminPinWrong": "Невірний PIN",
+    "stats.adminPinError": "Не вдалося перевірити PIN",
+    "stats.error": "Не вдалося завантажити статистику",
+    "admin.employeesTitle": "Керування співробітниками",
+    "admin.loadError": "Не вдалося завантажити співробітників",
+    "admin.empty": "Немає співробітників",
+    "admin.hidden": "Приховано",
+    "admin.addEmployee": "Додати співробітника",
+    "admin.renameEmployee": "Перейменувати співробітника",
+    "admin.save": "Зберегти"
 }

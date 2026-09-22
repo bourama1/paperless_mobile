@@ -177,5 +177,16 @@
     "stats.empty": "Nothing found for this day.",
     "stats.stageCompleted": "Completed",
     "stats.stageChecked": "Checked",
-    "stats.error": "Failed to load statistics"
+    "stats.adminPinTitle": "Enter PIN",
+    "stats.adminUnlock": "Unlock",
+    "stats.adminPinWrong": "Wrong PIN",
+    "stats.adminPinError": "Failed to verify PIN",
+    "stats.error": "Failed to load statistics",
+    "admin.employeesTitle": "Employee administration",
+    "admin.loadError": "Failed to load employees",
+    "admin.empty": "No employees",
+    "admin.hidden": "Hidden",
+    "admin.addEmployee": "Add employee",
+    "admin.renameEmployee": "Rename employee",
+    "admin.save": "Save"
 }

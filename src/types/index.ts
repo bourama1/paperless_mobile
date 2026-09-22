@@ -3,6 +3,10 @@ export interface Employee {
   name: string;
 }
 
+export interface EmployeeAdmin extends Employee {
+  active: boolean;
+}
+
 export interface Revision {
   id: number;
   document_id: number;

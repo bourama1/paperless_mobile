@@ -177,5 +177,16 @@
     "stats.empty": "Pro tento den zatím nic nebylo nalezeno.",
     "stats.stageCompleted": "Dokončeno",
     "stats.stageChecked": "Zkontrolováno",
-    "stats.error": "Nepodařilo se načíst statistiky"
+    "stats.adminPinTitle": "Zadejte PIN",
+    "stats.adminUnlock": "Odemknout",
+    "stats.adminPinWrong": "Nesprávný PIN",
+    "stats.adminPinError": "Nepodařilo se ověřit PIN",
+    "stats.error": "Nepodařilo se načíst statistiky",
+    "admin.employeesTitle": "Správa zaměstnanců",
+    "admin.loadError": "Nepodařilo se načíst zaměstnance",
+    "admin.empty": "Žádní zaměstnanci",
+    "admin.hidden": "Skryto",
+    "admin.addEmployee": "Přidat zaměstnance",
+    "admin.renameEmployee": "Přejmenovat zaměstnance",
+    "admin.save": "Uložit"
 }

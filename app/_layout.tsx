@@ -77,6 +77,7 @@ export default function RootLayout() {
                             name="document/[id]"
                             options={{ title: t("document.title"), headerShown: false }}
                         />
+                        <Stack.Screen name="admin/employees" options={{ headerShown: false }} />
                     </Stack>
                     <ConnectionErrorOverlay />
                 </PaperProvider>
