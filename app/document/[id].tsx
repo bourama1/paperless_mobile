@@ -27,9 +27,15 @@ interface DocumentMeta {
     completion: CompletionContext | null;
 }
 
-// Statuses that represent an order closed out without actually being
-// finished — the "Finish order" action only applies to these.
-const UNFINISHED_STATUSES: CompletionStatus[] = ["missing_product", "shipped_incomplete"];
+// Every completion status EXCEPT "complete" itself — none of these close
+// the order in the ERP (TOORS) right away (see completionController.ts:
+// only status "complete" triggers closeOrderInToors). The "Finish order"
+// action re-submits the completion as "complete" so it does.
+const NON_COMPLETE_STATUSES: CompletionStatus[] = [
+    "complete_with_changes",
+    "missing_product",
+    "shipped_incomplete",
+];
 
 export default function DocumentViewerScreen() {
     const { id, filename, fromPrepQueue } = useLocalSearchParams();
@@ -95,14 +101,14 @@ export default function DocumentViewerScreen() {
 
     // ── "Finish order" action ──
     // Only offered from inside an opened, revisioned document whose order
-    // was closed as missing_product/shipped_incomplete — i.e. someone has
+    // was closed as anything other than "complete" — i.e. someone has
     // actually reviewed this document before finishing the order, not just
     // tapped a button from the overview list.
     const canFinishOrder =
         !!docMeta &&
         docMeta.revisioned &&
         !!docMeta.status &&
-        UNFINISHED_STATUSES.includes(docMeta.status) &&
+        NON_COMPLETE_STATUSES.includes(docMeta.status) &&
         !!docMeta.completion;
 
     const queryClient = useQueryClient();
