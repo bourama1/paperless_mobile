@@ -99,9 +99,13 @@ export default function StatsScreen() {
     const dayNav = (
         <View style={styles.dayNav}>
             <IconButton icon="chevron-left" onPress={() => setDayOffset((d) => d - 1)} />
-            <Text variant="titleMedium" onLongPress={() => setPinModalVisible(true)}>
-                {formatDay(day)}
-            </Text>
+            {/* Plain Text's onLongPress isn't wired up on the web build
+                (react-native-web only implements the long-press timer for
+                Touchable/Pressable, not bare Text) — TouchableOpacity works
+                on every platform. */}
+            <TouchableOpacity onLongPress={() => setPinModalVisible(true)} delayLongPress={500}>
+                <Text variant="titleMedium">{formatDay(day)}</Text>
+            </TouchableOpacity>
             <IconButton
                 icon="chevron-right"
                 disabled={dayOffset >= 0}
