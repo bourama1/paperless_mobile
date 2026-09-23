@@ -7,6 +7,7 @@ import apiClient from "../../src/api/client";
 import { EmployeeAdmin } from "../../src/types";
 import { t } from "../../src/i18n";
 import { getAdminPin, clearAdminPin } from "../../src/services/adminAuth";
+import BaanCodesAdmin from "../../src/components/BaanCodesAdmin";
 
 /**
  * The hidden employee-admin screen — reached only via a long-press + PIN
@@ -39,18 +40,19 @@ export default function EmployeeAdminScreen() {
 
     const authHeaders = { "X-Admin-Pin": pin ?? "" };
 
-    // Two lists on one screen: the employees in every "who did this"
-    // picker, and the quality engineers who sign off QC with their own PIN.
-    // Same endpoints shape under a different base; engineers additionally
-    // carry a PIN.
-    const [kind, setKind] = useState<"employees" | "engineers">("employees");
+    // Three tabs: the employees in every "who did this" picker, the quality
+    // engineers who sign off QC with their own PIN (same endpoint shape
+    // under a different base, plus a PIN), and the prep checklist's BAAN
+    // code list — that one is its own panel (BaanCodesAdmin), not a name list.
+    const [kind, setKind] = useState<"employees" | "engineers" | "baan">("employees");
     const isEngineers = kind === "engineers";
+    const isBaan = kind === "baan";
     const base = isEngineers ? "/employees/admin/quality-engineers" : "/employees/admin";
 
     const { data: employees, isLoading, isError } = useQuery<EmployeeAdmin[]>({
         queryKey: ["employees-admin", kind, pin],
         queryFn: async () => (await apiClient.get(base, { headers: authHeaders })).data,
-        enabled: !!pin,
+        enabled: !!pin && !isBaan,
     });
 
     const onError = (error: any) => {
@@ -120,31 +122,39 @@ export default function EmployeeAdminScreen() {
             <Appbar.Header>
                 <Appbar.BackAction onPress={goBack} />
                 <Appbar.Content title={t("admin.title")} />
-                <Appbar.Action icon="plus" onPress={openCreateModal} />
+                {!isBaan && <Appbar.Action icon="plus" onPress={openCreateModal} />}
             </Appbar.Header>
 
             <SegmentedButtons
                 value={kind}
-                onValueChange={(v) => setKind(v as "employees" | "engineers")}
+                onValueChange={(v) => setKind(v as "employees" | "engineers" | "baan")}
                 style={styles.kindToggle}
                 buttons={[
                     { value: "employees", label: t("admin.employeesTab") },
                     { value: "engineers", label: t("admin.engineersTab") },
+                    { value: "baan", label: t("admin.baanTab") },
                 ]}
             />
 
-            {isLoading && (
+            {isBaan && pin && (
+                <BaanCodesAdmin
+                    authHeaders={authHeaders}
+                    onMessage={(message) => setSnackbar({ visible: true, message })}
+                />
+            )}
+
+            {!isBaan && isLoading && (
                 <View style={styles.center}>
                     <ActivityIndicator size="large" />
                 </View>
             )}
-            {isError && (
+            {!isBaan && isError && (
                 <View style={styles.center}>
                     <Text>{t("admin.loadError")}</Text>
                 </View>
             )}
 
-            {!isLoading && !isError && (
+            {!isBaan && !isLoading && !isError && (
                 <FlatList
                     data={employees}
                     keyExtractor={(item) => String(item.id)}

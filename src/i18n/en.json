@@ -211,5 +211,13 @@
     "admin.name": "Name",
     "admin.engineerPin": "Engineer PIN",
     "admin.engineerPinHint": "4–8 digits, unique for each engineer.",
-    "admin.engineerPinKeepHint": "Leave empty to keep the current PIN."
+    "admin.engineerPinKeepHint": "Leave empty to keep the current PIN.",
+    "admin.baanTab": "BAAN codes",
+    "admin.baanHint": "Out of the non-PTL items, the prep checklist only shows these BAAN codes. Empty list = every non-PTL item is shown.",
+    "admin.baanCodes": "BAAN codes (you can paste several at once)",
+    "admin.baanDescription": "Note (optional)",
+    "admin.baanAdd": "Add",
+    "admin.baanAdded": "Codes added: {count}",
+    "admin.baanCount": "Codes on the list: {count}",
+    "admin.baanEmpty": "The list is empty — every non-PTL item is shown."
 }

@@ -211,5 +211,13 @@
     "admin.name": "Jméno",
     "admin.engineerPin": "PIN kontrolora",
     "admin.engineerPinHint": "4–8 číslic, každý kontrolor musí mít vlastní.",
-    "admin.engineerPinKeepHint": "Nechte prázdné pro zachování současného PINu."
+    "admin.engineerPinKeepHint": "Nechte prázdné pro zachování současného PINu.",
+    "admin.baanTab": "BAAN kódy",
+    "admin.baanHint": "Příprava zobrazí z položek mimo PTL jen tyto BAAN kódy. Prázdný seznam = zobrazí se všechny položky mimo PTL.",
+    "admin.baanCodes": "BAAN kódy (můžete vložit i více najednou)",
+    "admin.baanDescription": "Poznámka (nepovinné)",
+    "admin.baanAdd": "Přidat",
+    "admin.baanAdded": "Přidáno kódů: {count}",
+    "admin.baanCount": "Kódů v seznamu: {count}",
+    "admin.baanEmpty": "Seznam je prázdný — zobrazují se všechny položky mimo PTL."
 }

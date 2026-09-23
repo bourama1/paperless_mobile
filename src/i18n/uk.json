@@ -211,5 +211,13 @@
     "admin.name": "Ім'я",
     "admin.engineerPin": "PIN контролера",
     "admin.engineerPinHint": "4–8 цифр, у кожного контролера свій.",
-    "admin.engineerPinKeepHint": "Залиште порожнім, щоб зберегти поточний PIN."
+    "admin.engineerPinKeepHint": "Залиште порожнім, щоб зберегти поточний PIN.",
+    "admin.baanTab": "Коди BAAN",
+    "admin.baanHint": "Зі списку позицій поза PTL підготовка показує лише ці коди BAAN. Порожній список = показуються всі позиції поза PTL.",
+    "admin.baanCodes": "Коди BAAN (можна вставити кілька одразу)",
+    "admin.baanDescription": "Примітка (необов'язково)",
+    "admin.baanAdd": "Додати",
+    "admin.baanAdded": "Додано кодів: {count}",
+    "admin.baanCount": "Кодів у списку: {count}",
+    "admin.baanEmpty": "Список порожній — показуються всі позиції поза PTL."
 }
