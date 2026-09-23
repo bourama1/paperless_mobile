@@ -18,6 +18,9 @@ import PbomTypePickerModal from "../../src/components/PbomTypePickerModal";
 // shifting displayed times away from the real (correct, UTC-stored) value.
 const FACTORY_TIME_ZONE = "Europe/Prague";
 
+// Orders flagged for a quality-control check (TMP 00000040 = "j").
+const QC_COLOR = "#6a1b9a";
+
 // How often the Docs tab silently refreshes while someone is looking at it.
 const DOCS_POLL_INTERVAL_MS = 10_000;
 
@@ -51,6 +54,7 @@ export default function DocumentsScreen() {
     const [statusFilters, setStatusFilters] = useState<Set<CompletionStatus>>(new Set());
     const [revisionedOnly, setRevisionedOnly] = useState(false);
     const [uncheckedOnly, setUncheckedOnly] = useState(false);
+    const [qcOnly, setQcOnly] = useState(false);
     const order = useBarcodeScan();
 
     const statusParam = Array.from(statusFilters).join(",");
@@ -66,7 +70,7 @@ export default function DocumentsScreen() {
         isError,
         refetch,
     } = useQuery<DocumentsOverviewResponse>({
-        queryKey: ["documents-overview", statusParam, revisionedOnly, uncheckedOnly],
+        queryKey: ["documents-overview", statusParam, revisionedOnly, uncheckedOnly, qcOnly],
         refetchInterval: isFocused ? DOCS_POLL_INTERVAL_MS : false,
         queryFn: async () => {
             const response = await apiClient.get("/files", {
@@ -74,6 +78,7 @@ export default function DocumentsScreen() {
                     ...(statusParam ? { status: statusParam } : {}),
                     ...(revisionedOnly ? { revisioned: "true" } : {}),
                     ...(uncheckedOnly ? { unchecked: "true" } : {}),
+                    ...(qcOnly ? { qc: "true" } : {}),
                 },
             });
             return response.data;
@@ -161,6 +166,14 @@ export default function DocumentsScreen() {
                     style={[styles.filterChip, uncheckedOnly && { backgroundColor: "#c62828" }]}
                     textStyle={uncheckedOnly ? styles.filterChipTextSelected : styles.filterChipText}>
                     {t("docs.filterUnchecked")}
+                </Chip>
+                <Chip
+                    mode={qcOnly ? "flat" : "outlined"}
+                    selected={qcOnly}
+                    onPress={() => setQcOnly((v) => !v)}
+                    style={[styles.filterChip, qcOnly && { backgroundColor: QC_COLOR }]}
+                    textStyle={qcOnly ? styles.filterChipTextSelected : styles.filterChipText}>
+                    {t("docs.filterQc")}
                 </Chip>
             </View>
             <Divider />
@@ -288,6 +301,20 @@ function DocumentCard({ item, router }: { item: DocumentOverviewItem; router: Re
                     }
                     right={() => (importing ? <ActivityIndicator size="small" style={{ marginRight: 12 }} /> : (
                         <View style={styles.chipRow}>
+                            {item.qc_required && (
+                                <Chip
+                                    mode="flat"
+                                    compact
+                                    style={item.qc_checked ? styles.checkedChip : styles.qcChip}
+                                    textStyle={styles.chipText}>
+                                    {item.qc_checked ?
+                                        t("docs.qcDone")
+                                    :   t("docs.qcProgress", {
+                                            checked: item.qc_checked_cycles,
+                                            total: item.total_cycles,
+                                        })}
+                                </Chip>
+                            )}
                             {item.revisioned && (
                                 <Chip mode="flat" compact style={styles.revisionedChip} textStyle={styles.chipText}>
                                     {t("docs.filterRevisioned")}
@@ -363,6 +390,7 @@ const styles = StyleSheet.create({
     cardTitle: { fontWeight: "bold", flex: 1 },
     chipRow: { flexDirection: "row", marginRight: 12, gap: 6 },
     revisionedChip: { backgroundColor: "#607d8b" },
+    qcChip: { backgroundColor: QC_COLOR },
     statusChip: {},
     checkedChip: { backgroundColor: "#2e7d32" },
     uncheckedChip: { backgroundColor: "#c62828" },

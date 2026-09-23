@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, StyleSheet, ActivityIndicator, TouchableOpacity, FlatList } from "react-native";
-import { Appbar, Text, Card, IconButton, Portal, Modal, TextInput, Snackbar } from "react-native-paper";
+import { Appbar, Text, Card, IconButton, Portal, Modal, TextInput, Snackbar, SegmentedButtons } from "react-native-paper";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import apiClient from "../../src/api/client";
@@ -39,10 +39,17 @@ export default function EmployeeAdminScreen() {
 
     const authHeaders = { "X-Admin-Pin": pin ?? "" };
 
+    // Two lists on one screen: the employees in every "who did this"
+    // picker, and the quality engineers who sign off QC with their own PIN.
+    // Same endpoints shape under a different base; engineers additionally
+    // carry a PIN.
+    const [kind, setKind] = useState<"employees" | "engineers">("employees");
+    const isEngineers = kind === "engineers";
+    const base = isEngineers ? "/employees/admin/quality-engineers" : "/employees/admin";
+
     const { data: employees, isLoading, isError } = useQuery<EmployeeAdmin[]>({
-        queryKey: ["employees-admin", pin],
-        queryFn: async () =>
-            (await apiClient.get("/employees/admin", { headers: authHeaders })).data,
+        queryKey: ["employees-admin", kind, pin],
+        queryFn: async () => (await apiClient.get(base, { headers: authHeaders })).data,
         enabled: !!pin,
     });
 
@@ -50,68 +57,81 @@ export default function EmployeeAdminScreen() {
         const msg = error?.response?.data?.error || error.message;
         setSnackbar({ visible: true, message: msg });
     };
-    const onMutated = () => queryClient.invalidateQueries({ queryKey: ["employees-admin", pin] });
+    const onMutated = () => queryClient.invalidateQueries({ queryKey: ["employees-admin", kind, pin] });
 
-    const createEmployee = useMutation({
-        mutationFn: async (name: string) =>
-            (await apiClient.post("/employees/admin", { name }, { headers: authHeaders })).data,
+    // `pin` in the body is the engineer's QC PIN (engineers only) — distinct
+    // from the admin PIN in the header.
+    const createEntry = useMutation({
+        mutationFn: async (body: { name: string; pin?: string }) =>
+            (await apiClient.post(base, body, { headers: authHeaders })).data,
         onSuccess: onMutated,
         onError,
     });
-    const renameEmployee = useMutation({
-        mutationFn: async ({ id, name }: { id: number; name: string }) =>
-            (await apiClient.put(`/employees/admin/${id}`, { name }, { headers: authHeaders })).data,
+    const updateEntry = useMutation({
+        mutationFn: async ({ id, ...body }: { id: number; name: string; pin?: string }) =>
+            (await apiClient.put(`${base}/${id}`, body, { headers: authHeaders })).data,
         onSuccess: onMutated,
         onError,
     });
     const setActive = useMutation({
         mutationFn: async ({ id, active }: { id: number; active: boolean }) =>
-            (
-                await apiClient.post(
-                    `/employees/admin/${id}/${active ? "restore" : "hide"}`,
-                    {},
-                    { headers: authHeaders },
-                )
-            ).data,
+            (await apiClient.post(`${base}/${id}/${active ? "restore" : "hide"}`, {}, { headers: authHeaders }))
+                .data,
         onSuccess: onMutated,
         onError,
     });
 
-    // Shared "create" / "rename" modal — editingId null means create-mode.
+    // Shared "create" / "edit" modal — editingId null means create-mode.
     const [nameModalVisible, setNameModalVisible] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
     const [nameInput, setNameInput] = useState("");
+    const [qcPinInput, setQcPinInput] = useState("");
 
     const openCreateModal = () => {
         setEditingId(null);
         setNameInput("");
+        setQcPinInput("");
         setNameModalVisible(true);
     };
     const openRenameModal = (emp: EmployeeAdmin) => {
         setEditingId(emp.id);
         setNameInput(emp.name);
+        setQcPinInput("");
         setNameModalVisible(true);
     };
     const closeNameModal = () => setNameModalVisible(false);
+    // An engineer needs a PIN when created; on edit an empty PIN keeps theirs.
+    const pinMissing = isEngineers && editingId === null && !qcPinInput;
     const saveName = () => {
         const trimmed = nameInput.trim();
-        if (!trimmed) return;
+        if (!trimmed || pinMissing) return;
+        const pinPart = isEngineers && qcPinInput ? { pin: qcPinInput } : {};
         if (editingId === null) {
-            createEmployee.mutate(trimmed);
+            createEntry.mutate({ name: trimmed, ...pinPart });
         } else {
-            renameEmployee.mutate({ id: editingId, name: trimmed });
+            updateEntry.mutate({ id: editingId, name: trimmed, ...pinPart });
         }
         closeNameModal();
     };
-    const savingName = createEmployee.isPending || renameEmployee.isPending;
+    const savingName = createEntry.isPending || updateEntry.isPending;
 
     return (
         <View style={styles.container}>
             <Appbar.Header>
                 <Appbar.BackAction onPress={goBack} />
-                <Appbar.Content title={t("admin.employeesTitle")} />
+                <Appbar.Content title={t("admin.title")} />
                 <Appbar.Action icon="plus" onPress={openCreateModal} />
             </Appbar.Header>
+
+            <SegmentedButtons
+                value={kind}
+                onValueChange={(v) => setKind(v as "employees" | "engineers")}
+                style={styles.kindToggle}
+                buttons={[
+                    { value: "employees", label: t("admin.employeesTab") },
+                    { value: "engineers", label: t("admin.engineersTab") },
+                ]}
+            />
 
             {isLoading && (
                 <View style={styles.center}>
@@ -163,19 +183,46 @@ export default function EmployeeAdminScreen() {
             <Portal>
                 <Modal visible={nameModalVisible} onDismiss={closeNameModal} contentContainerStyle={styles.modal}>
                     <Text variant="titleLarge" style={{ marginBottom: 12 }}>
-                        {editingId === null ? t("admin.addEmployee") : t("admin.renameEmployee")}
+                        {isEngineers ?
+                            editingId === null ?
+                                t("admin.addEngineer")
+                            :   t("admin.editEngineer")
+                        : editingId === null ?
+                            t("admin.addEmployee")
+                        :   t("admin.renameEmployee")}
                     </Text>
                     <TextInput
                         mode="outlined"
+                        label={t("admin.name")}
                         value={nameInput}
                         onChangeText={setNameInput}
                         autoFocus
                         onSubmitEditing={saveName}
                     />
+                    {isEngineers && (
+                        <>
+                            <TextInput
+                                mode="outlined"
+                                label={t("admin.engineerPin")}
+                                value={qcPinInput}
+                                onChangeText={setQcPinInput}
+                                secureTextEntry
+                                keyboardType="number-pad"
+                                style={{ marginTop: 12 }}
+                                onSubmitEditing={saveName}
+                            />
+                            <Text variant="bodySmall" style={{ color: "#666", marginTop: 4 }}>
+                                {editingId === null ? t("admin.engineerPinHint") : t("admin.engineerPinKeepHint")}
+                            </Text>
+                        </>
+                    )}
                     <TouchableOpacity
-                        style={[styles.confirmBtn, (!nameInput.trim() || savingName) && styles.confirmBtnDisabled]}
+                        style={[
+                            styles.confirmBtn,
+                            (!nameInput.trim() || pinMissing || savingName) && styles.confirmBtnDisabled,
+                        ]}
                         activeOpacity={0.8}
-                        disabled={!nameInput.trim() || savingName}
+                        disabled={!nameInput.trim() || pinMissing || savingName}
                         onPress={saveName}>
                         {savingName ?
                             <ActivityIndicator size="small" color="#fff" />
@@ -198,6 +245,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: "#fff" },
     center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
     list: { padding: 12, flexGrow: 1 },
+    kindToggle: { marginHorizontal: 12, marginTop: 12 },
     card: { marginBottom: 8 },
     cardHidden: { opacity: 0.6 },
     row: { flexDirection: "row", alignItems: "center" },

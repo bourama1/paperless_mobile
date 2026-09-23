@@ -8,7 +8,8 @@ import { Asset } from "expo-asset";
 import { readAsStringAsync } from "expo-file-system/legacy";
 import apiClient, { BASE_URL, API_KEY } from "../../src/api/client";
 import { t } from "../../src/i18n";
-import { CompletionContext, CompletionStatus, CheckStatus, CycleCheck } from "../../src/types";
+import { CompletionContext, CompletionStatus, CheckStatus, CycleCheck, QcCycleCheck } from "../../src/types";
+import QcCheckModal from "../../src/components/QcCheckModal";
 import { useEmployees } from "../../src/hooks/useEmployees";
 import EmployeePicker from "../../src/components/EmployeePicker";
 import PrepLabelModal from "../../src/components/PrepLabelModal";
@@ -25,6 +26,12 @@ interface DocumentMeta {
     unchecked_cycles: number[];
     cycles: CycleCheck[];
     completion: CompletionContext | null;
+    // Quality-control sign-off (TMP 00000040 = "j") — separate from the
+    // standard check above; done by quality engineers with their own PIN.
+    qc_required: boolean | null;
+    qc_checked: boolean;
+    qc_checked_cycles: number;
+    qc_cycles: QcCycleCheck[];
 }
 
 // Every completion status EXCEPT "complete" itself — none of these close
@@ -98,6 +105,13 @@ export default function DocumentViewerScreen() {
     // than useful. docMeta.status is null until the kiosk records a
     // completion for this project/position (see completionService.ts).
     const canCheck = !!(docMeta?.project_number && docMeta?.position && docMeta?.status);
+
+    // ── Quality-control sign-off ──
+    // Its own action, only on orders whose TMP file asks for it, and only
+    // once the order is finished (same gate as the standard check). The
+    // quality engineer unlocks it with their personal PIN — see QcCheckModal.
+    const canQcCheck = canCheck && docMeta?.qc_required === true && !!docMeta?.completion?.workstation;
+    const [qcModalVisible, setQcModalVisible] = useState(false);
 
     // ── "Finish order" action ──
     // Only offered from inside an opened, revisioned document whose order
@@ -417,6 +431,35 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
         </Portal>
     );
 
+    const qcModal = canQcCheck && docMeta ? (
+        <QcCheckModal
+            visible={qcModalVisible}
+            onDismiss={() => setQcModalVisible(false)}
+            onDone={(engineerName) => {
+                setQcModalVisible(false);
+                setSnackbar({ visible: true, message: t("qc.success", { name: engineerName }) });
+                queryClient.invalidateQueries({ queryKey: ["document-meta", id] });
+                queryClient.invalidateQueries({ queryKey: ["documents-overview"] });
+            }}
+            projectNumber={docMeta.project_number ?? ""}
+            position={docMeta.position ?? ""}
+            workstation={docMeta.completion?.workstation ?? ""}
+            totalCycles={docMeta.total_cycles}
+            cycles={docMeta.qc_cycles ?? []}
+        />
+    ) : null;
+
+    // QC action's header icon — purple while a sign-off is still owed,
+    // green once every cycle is QC-OK.
+    const qcAction = (
+        <Appbar.Action
+            icon={docMeta?.qc_checked ? "shield-check" : "shield-lock-outline"}
+            color={docMeta?.qc_checked ? "#2e7d32" : "#6a1b9a"}
+            onPress={() => setQcModalVisible(true)}
+            disabled={loading}
+        />
+    );
+
     const checkModal = (
         <Portal>
             <Modal visible={checkModalVisible} onDismiss={closeCheckModal} contentContainerStyle={styles.modal}>
@@ -564,6 +607,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                     {mode === "view" && canPrintLabel && (
                         <Appbar.Action icon="printer" onPress={() => setLabelPickerVisible(true)} disabled={loading} />
                     )}
+                    {mode === "view" && canQcCheck && qcAction}
                     {mode === "view" && canCheck && (
                         <Appbar.Action
                             icon={docMeta?.checked ? "check-decagram" : "clipboard-check-outline"}
@@ -604,6 +648,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                 {employeePickerModal}
                 {finishModal}
                 {checkModal}
+                {qcModal}
             </View>
         );
     }
@@ -625,6 +670,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                 {mode === "view" && canPrintLabel && (
                     <Appbar.Action icon="printer" onPress={() => setLabelPickerVisible(true)} disabled={loading} />
                 )}
+                {mode === "view" && canQcCheck && qcAction}
                 {mode === "view" && canCheck && (
                     <Appbar.Action
                         icon={docMeta?.checked ? "check-decagram" : "clipboard-check-outline"}
@@ -681,6 +727,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
             {employeePickerModal}
             {finishModal}
             {checkModal}
+            {qcModal}
         </View>
     );
 }

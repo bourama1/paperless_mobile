@@ -125,6 +125,28 @@ export interface DocumentOverviewItem {
   checked_cycles: number;
   total_cycles: number;
   unchecked_cycles: number[];
+  // Needs a quality-control check (TMP 00000040 = "j"); null = not known yet
+  qc_required: boolean | null;
+  // The quality engineer's per-cycle sign-off — separate from `checked`.
+  qc_checked: boolean;
+  qc_checked_cycles: number;
+}
+
+// One cycle's quality-control sign-off (order_qc_checks), done by a
+// quality engineer identified by their PIN.
+export interface QcCycleCheck {
+  cycleIndex: number;
+  checked: boolean;
+  status: CheckStatus | null;
+  engineerName: string | null;
+  note: string | null;
+  checkedAt: string | null;
+}
+
+export interface QualityEngineer {
+  id: number;
+  name: string;
+  active: boolean;
 }
 
 export interface DocumentsOverviewResponse {
