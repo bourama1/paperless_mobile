@@ -224,7 +224,7 @@
     "docs.awaitingFix": "Čeká na opravu",
     "document.checkAwaitingFix": "Kontrola kvality našla problém — po opravě cyklus znovu zkontrolujte. Co je potřeba opravit, najdete v historii níže.",
     "manual.title": "Ruční dokončení",
-    "manual.hint": "Pro zakázky, které nejde dokončit přes P2L. Stav „Dokončeno“ zde není — zakázka se v ERP automaticky neuzavře.",
+    "manual.hint": "Pro zakázky, které nejde dokončit přes P2L. Stav „Kompletní“ zde není — zakázka se v ERP automaticky neuzavře.",
     "manual.cycle": "Cyklus (celkem {total})",
     "manual.alreadyCompleted": "Tento cyklus už je dokončený — potvrzením přidáte nový záznam.",
     "manual.confirm": "Dokončit cyklus {cycle}",
