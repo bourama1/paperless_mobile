@@ -134,9 +134,6 @@
     "document.checkTitle": "Order check",
     "document.checkHint": "Select the cycle (package) you are checking.",
     "document.checkCycleLabel": "Checked {checked}/{total} cycles",
-    "document.checkCompletedBy": "Completed by: {name}",
-    "document.checkLastOk": "Last checked by: {name} (OK)",
-    "document.checkLastIssue": "Last reported an issue: {name}",
     "document.checkStatusOk": "OK",
     "document.checkStatusIssue": "Issue",
     "document.checkNotePlaceholder": "Note (optional)",
@@ -197,8 +194,6 @@
     "qc.pinError": "Failed to verify PIN",
     "qc.signedInAs": "Checking as: {name}",
     "qc.cycleLabel": "{checked}/{total} cycles checked",
-    "qc.lastOk": "Last approved by: {name} (OK)",
-    "qc.lastIssue": "Last issue reported by: {name}",
     "qc.confirmCycle": "Confirm QC for cycle {cycle}",
     "qc.success": "Quality check recorded ({name}).",
     "docs.qcProgress": "Quality {checked}/{total}",
@@ -219,5 +214,13 @@
     "admin.baanAdd": "Add",
     "admin.baanAdded": "Codes added: {count}",
     "admin.baanCount": "Codes on the list: {count}",
-    "admin.baanEmpty": "The list is empty — every non-PTL item is shown."
+    "admin.baanEmpty": "The list is empty — every non-PTL item is shown.",
+    "history.title": "Cycle {cycle} history",
+    "history.empty": "No records yet",
+    "history.prepared": "Preparation",
+    "history.completed": "Completion",
+    "history.check": "Check",
+    "history.qc": "Quality control",
+    "docs.awaitingFix": "Awaiting fix",
+    "document.checkAwaitingFix": "Quality control found a problem — check this cycle again once it's fixed. What needs fixing is in the history below."
 }

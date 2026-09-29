@@ -87,6 +87,19 @@ export interface CompletionContext {
 
 export type CheckStatus = "ok" | "issue";
 
+// One entry of an order position's full history (backend
+// orderHistoryService): every preparation, completion, standard check and
+// QC sign-off — all rounds, oldest first.
+export interface OrderHistoryEvent {
+  cycleIndex: number;
+  type: "prepared" | "completed" | "check" | "qc";
+  by: string;
+  // completion status for "completed"; "ok" | "issue" for check/qc; null for "prepared"
+  status: string | null;
+  note: string | null;
+  at: string;
+}
+
 export interface CycleCheck {
   cycleIndex: number;
   checked: boolean;
@@ -98,6 +111,8 @@ export interface CycleCheck {
   // the document) — shown to the checker so they know who to ask.
   completedBy?: string | null;
   completedAt?: string | null;
+  // QC reported a problem after this cycle's last standard check.
+  awaitingFix?: boolean;
 }
 
 export interface DocumentOverviewItem {
@@ -125,6 +140,9 @@ export interface DocumentOverviewItem {
   checked_cycles: number;
   total_cycles: number;
   unchecked_cycles: number[];
+  // QC reported a problem after the last standard check — waiting for a
+  // fix and a new check (the cycle counts as unchecked meanwhile).
+  awaiting_fix: boolean;
   // Needs a quality-control check (TMP 00000040 = "j"); null = not known yet
   qc_required: boolean | null;
   // The quality engineer's per-cycle sign-off — separate from `checked`.

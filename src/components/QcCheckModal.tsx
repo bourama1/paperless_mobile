@@ -4,7 +4,8 @@ import { Portal, Modal, Text, TextInput } from "react-native-paper";
 import { useMutation } from "@tanstack/react-query";
 import apiClient from "../api/client";
 import { t } from "../i18n";
-import { CheckStatus, QcCycleCheck } from "../types";
+import { CheckStatus, OrderHistoryEvent, QcCycleCheck } from "../types";
+import CycleHistory from "./CycleHistory";
 
 interface QcCheckModalProps {
     visible: boolean;
@@ -16,6 +17,9 @@ interface QcCheckModalProps {
     workstation: string;
     totalCycles: number;
     cycles: QcCycleCheck[];
+    /** Everything that happened to the order — every completion, standard
+     *  check and QC round with notes — shown per selected cycle. */
+    history: OrderHistoryEvent[];
 }
 
 /**
@@ -35,6 +39,7 @@ export default function QcCheckModal({
     workstation,
     totalCycles,
     cycles,
+    history,
 }: QcCheckModalProps) {
     const [pin, setPin] = useState("");
     const [engineerName, setEngineerName] = useState<string | null>(null);
@@ -106,7 +111,6 @@ export default function QcCheckModal({
         },
     });
 
-    const selected = cycles.find((c) => c.cycleIndex === selectedCycle);
     const checkedCount = cycles.filter((c) => c.checked).length;
 
     return (
@@ -173,14 +177,7 @@ export default function QcCheckModal({
                                 ))}
                             </View>
                         </ScrollView>
-                        {selected?.checkedAt ?
-                            <Text variant="bodySmall" style={{ color: "#666", marginBottom: 12 }}>
-                                {t(selected.status === "ok" ? "qc.lastOk" : "qc.lastIssue", {
-                                    name: selected.engineerName ?? "",
-                                })}
-                                {selected.note ? ` — ${selected.note}` : ""}
-                            </Text>
-                        :   null}
+                        {selectedCycle !== null && <CycleHistory events={history} cycleIndex={selectedCycle} />}
 
                         <View style={styles.statusToggleRow}>
                             <TouchableOpacity

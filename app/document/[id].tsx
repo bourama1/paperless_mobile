@@ -8,7 +8,15 @@ import { Asset } from "expo-asset";
 import { readAsStringAsync } from "expo-file-system/legacy";
 import apiClient, { BASE_URL, API_KEY } from "../../src/api/client";
 import { t } from "../../src/i18n";
-import { CompletionContext, CompletionStatus, CheckStatus, CycleCheck, QcCycleCheck } from "../../src/types";
+import {
+    CompletionContext,
+    CompletionStatus,
+    CheckStatus,
+    CycleCheck,
+    QcCycleCheck,
+    OrderHistoryEvent,
+} from "../../src/types";
+import CycleHistory from "../../src/components/CycleHistory";
 import QcCheckModal from "../../src/components/QcCheckModal";
 import { useEmployees } from "../../src/hooks/useEmployees";
 import EmployeePicker from "../../src/components/EmployeePicker";
@@ -32,6 +40,8 @@ interface DocumentMeta {
     qc_checked: boolean;
     qc_checked_cycles: number;
     qc_cycles: QcCycleCheck[];
+    // Every preparation / completion / check / QC round, oldest first.
+    history: OrderHistoryEvent[];
 }
 
 // Every completion status EXCEPT "complete" itself — none of these close
@@ -107,10 +117,12 @@ export default function DocumentViewerScreen() {
     const canCheck = !!(docMeta?.project_number && docMeta?.position && docMeta?.status);
 
     // ── Quality-control sign-off ──
-    // Its own action, only on orders whose TMP file asks for it, and only
-    // once the order is finished (same gate as the standard check). The
-    // quality engineer unlocks it with their personal PIN — see QcCheckModal.
-    const canQcCheck = canCheck && docMeta?.qc_required === true && !!docMeta?.completion?.workstation;
+    // Its own action, on every finished order (any completion status —
+    // same gate as the standard check); orders whose TMP file asks for QC
+    // are just highlighted (qcAction's colour, the Docs tab's QC filter).
+    // The quality engineer unlocks it with their personal PIN — see
+    // QcCheckModal.
+    const canQcCheck = canCheck && !!docMeta?.completion?.workstation;
     const [qcModalVisible, setQcModalVisible] = useState(false);
 
     // ── "Finish order" action ──
@@ -446,15 +458,21 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
             workstation={docMeta.completion?.workstation ?? ""}
             totalCycles={docMeta.total_cycles}
             cycles={docMeta.qc_cycles ?? []}
+            history={docMeta.history ?? []}
         />
     ) : null;
 
-    // QC action's header icon — purple while a sign-off is still owed,
-    // green once every cycle is QC-OK.
+    // QC action's header icon — green once every cycle is QC-OK, purple
+    // while an order that REQUIRES QC (TMP file) still owes it, neutral
+    // for an order where QC is optional.
     const qcAction = (
         <Appbar.Action
             icon={docMeta?.qc_checked ? "shield-check" : "shield-lock-outline"}
-            color={docMeta?.qc_checked ? "#2e7d32" : "#6a1b9a"}
+            color={
+                docMeta?.qc_checked ? "#2e7d32"
+                : docMeta?.qc_required ? "#6a1b9a"
+                : undefined
+            }
             onPress={() => setQcModalVisible(true)}
             disabled={loading}
         />
@@ -484,7 +502,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                                 style={[
                                     styles.cyclePill,
                                     cycle.checked && styles.cyclePillChecked,
-                                    cycle.status === "issue" && styles.cyclePillIssue,
+                                    (cycle.status === "issue" || cycle.awaitingFix) && styles.cyclePillIssue,
                                     selectedCycleIndex === cycle.cycleIndex && styles.cyclePillSelected,
                                 ]}
                                 activeOpacity={0.8}
@@ -492,7 +510,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                                 <Text
                                     style={[
                                         styles.cyclePillText,
-                                        (cycle.checked || cycle.status === "issue") && styles.cyclePillTextLight,
+                                        (cycle.checked || cycle.status === "issue" || cycle.awaitingFix) && styles.cyclePillTextLight,
                                     ]}>
                                     {cycle.cycleIndex}
                                 </Text>
@@ -500,27 +518,17 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                         ))}
                     </View>
                 </ScrollView>
-                {(() => {
-                    const selected = docMeta?.cycles?.find((c) => c.cycleIndex === selectedCycleIndex);
-                    if (!selected) return null;
-                    return (
-                        <View style={{ marginBottom: 12 }}>
-                            {selected.completedBy ? (
-                                <Text variant="bodyMedium" style={{ color: "#333", fontWeight: "600", marginBottom: 4 }}>
-                                    {t("document.checkCompletedBy", { name: selected.completedBy })}
-                                </Text>
-                            ) : null}
-                            {selected.checkedAt ? (
-                                <Text variant="bodySmall" style={{ color: "#666" }}>
-                                    {t(selected.status === "ok" ? "document.checkLastOk" : "document.checkLastIssue", {
-                                        name: selected.employeeName ?? "",
-                                    })}
-                                    {selected.note ? ` — ${selected.note}` : ""}
-                                </Text>
-                            ) : null}
-                        </View>
-                    );
-                })()}
+                {/* Full history of the selected cycle — every completion,
+                    check and QC round with notes, e.g. what QC found that
+                    this re-check is now verifying. */}
+                {docMeta?.cycles?.find((c) => c.cycleIndex === selectedCycleIndex)?.awaitingFix && (
+                    <Text variant="bodyMedium" style={{ color: "#c62828", fontWeight: "600", marginBottom: 8 }}>
+                        {t("document.checkAwaitingFix")}
+                    </Text>
+                )}
+                {selectedCycleIndex !== null && (
+                    <CycleHistory events={docMeta?.history ?? []} cycleIndex={selectedCycleIndex} />
+                )}
 
                 <View style={styles.statusToggleRow}>
                     <TouchableOpacity

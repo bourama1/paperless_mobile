@@ -301,7 +301,13 @@ function DocumentCard({ item, router }: { item: DocumentOverviewItem; router: Re
                     }
                     right={() => (importing ? <ActivityIndicator size="small" style={{ marginRight: 12 }} /> : (
                         <View style={styles.chipRow}>
-                            {item.qc_required && (
+                            {item.awaiting_fix && (
+                                <Chip mode="flat" compact style={styles.uncheckedChip} textStyle={styles.chipText}>
+                                    {t("docs.awaitingFix")}
+                                </Chip>
+                            )}
+                            {/* QC-required orders always; optional ones once someone signed off */}
+                            {(item.qc_required || item.qc_checked_cycles > 0) && (
                                 <Chip
                                     mode="flat"
                                     compact
