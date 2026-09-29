@@ -18,6 +18,8 @@ import {
 } from "../../src/types";
 import CycleHistory from "../../src/components/CycleHistory";
 import QcCheckModal from "../../src/components/QcCheckModal";
+import AdminPinModal from "../../src/components/AdminPinModal";
+import ManualCompletionModal from "../../src/components/ManualCompletionModal";
 import { useEmployees } from "../../src/hooks/useEmployees";
 import EmployeePicker from "../../src/components/EmployeePicker";
 import PrepLabelModal from "../../src/components/PrepLabelModal";
@@ -124,6 +126,15 @@ export default function DocumentViewerScreen() {
     // QcCheckModal.
     const canQcCheck = canCheck && !!docMeta?.completion?.workstation;
     const [qcModalVisible, setQcModalVisible] = useState(false);
+
+    // ── Manual completion (hidden) ──
+    // For orders that can't be completed through P2L: long-press the
+    // document title → admin PIN → a kiosk-like completion with only the
+    // non-"complete" statuses (see ManualCompletionModal). The verified PIN
+    // lives only in this state while the modal is open.
+    const canManualComplete = !!(docMeta?.project_number && docMeta?.position);
+    const [manualPinVisible, setManualPinVisible] = useState(false);
+    const [manualPin, setManualPin] = useState<string | null>(null);
 
     // ── "Finish order" action ──
     // Only offered from inside an opened, revisioned document whose order
@@ -443,6 +454,49 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
         </Portal>
     );
 
+    // Header title — long-pressing it is the hidden entry to manual
+    // completion. TouchableOpacity rather than Text's own onLongPress,
+    // which never fires on the web build (react-native-web only times
+    // long-presses for Touchable/Pressable).
+    const headerTitle =
+        mode === "edit" ? t("document.editing")
+        : canManualComplete ?
+            <TouchableOpacity onLongPress={() => setManualPinVisible(true)} delayLongPress={600}>
+                <Text variant="titleLarge" numberOfLines={1}>
+                    {filename}
+                </Text>
+            </TouchableOpacity>
+        :   `${filename}`;
+
+    const manualCompletionModals = (
+        <>
+            <AdminPinModal
+                visible={manualPinVisible}
+                onDismiss={() => setManualPinVisible(false)}
+                onUnlocked={(pin) => {
+                    setManualPinVisible(false);
+                    setManualPin(pin);
+                }}
+            />
+            {manualPin !== null && docMeta && (
+                <ManualCompletionModal
+                    visible
+                    onDismiss={() => setManualPin(null)}
+                    onDone={() => {
+                        setManualPin(null);
+                        setSnackbar({ visible: true, message: t("manual.success") });
+                        queryClient.invalidateQueries({ queryKey: ["document-meta", id] });
+                        queryClient.invalidateQueries({ queryKey: ["documents-overview"] });
+                    }}
+                    documentId={Number(id)}
+                    totalCycles={docMeta.total_cycles ?? 1}
+                    history={docMeta.history ?? []}
+                    adminPin={manualPin}
+                />
+            )}
+        </>
+    );
+
     const qcModal = canQcCheck && docMeta ? (
         <QcCheckModal
             visible={qcModalVisible}
@@ -603,7 +657,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
             <View style={styles.container}>
                 <Appbar.Header>
                     <Appbar.BackAction onPress={() => router.back()} />
-                    <Appbar.Content title={mode === "edit" ? t("document.editing") : `${filename}`} />
+                    <Appbar.Content title={headerTitle} />
                     {mode === "view" && canFinishOrder && (
                         <Appbar.Action
                             icon="flag-checkered"
@@ -657,6 +711,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
                 {finishModal}
                 {checkModal}
                 {qcModal}
+                {manualCompletionModals}
             </View>
         );
     }
@@ -666,7 +721,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
         <View style={styles.container}>
             <Appbar.Header>
                 <Appbar.BackAction onPress={() => router.back()} />
-                <Appbar.Content title={mode === "edit" ? t("document.editing") : `${filename}`} />
+                <Appbar.Content title={headerTitle} />
                 {mode === "view" && canFinishOrder && (
                     <Appbar.Action
                         icon="flag-checkered"
@@ -736,6 +791,7 @@ window.ReactNativeWebView={postMessage:function(m){window.parent.postMessage(JSO
             {finishModal}
             {checkModal}
             {qcModal}
+            {manualCompletionModals}
         </View>
     );
 }

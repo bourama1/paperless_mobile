@@ -222,5 +222,11 @@
     "history.check": "Check",
     "history.qc": "Quality control",
     "docs.awaitingFix": "Awaiting fix",
-    "document.checkAwaitingFix": "Quality control found a problem — check this cycle again once it's fixed. What needs fixing is in the history below."
+    "document.checkAwaitingFix": "Quality control found a problem — check this cycle again once it's fixed. What needs fixing is in the history below.",
+    "manual.title": "Manual completion",
+    "manual.hint": "For orders that can't be completed through P2L. \"Complete\" isn't offered here — the order won't be closed in ERP automatically.",
+    "manual.cycle": "Cycle ({total} in total)",
+    "manual.alreadyCompleted": "This cycle is already completed — confirming adds a new record.",
+    "manual.confirm": "Complete cycle {cycle}",
+    "manual.success": "The cycle was completed manually."
 }

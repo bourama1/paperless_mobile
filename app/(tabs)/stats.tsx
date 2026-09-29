@@ -1,12 +1,13 @@
 import React, { useCallback, useState } from "react";
 import { FlatList, View, StyleSheet, ActivityIndicator, RefreshControl, TouchableOpacity } from "react-native";
-import { Card, Text, IconButton, SegmentedButtons, Portal, Modal, TextInput } from "react-native-paper";
+import { Card, Text, IconButton, SegmentedButtons } from "react-native-paper";
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect, useRouter } from "expo-router";
 import apiClient from "../../src/api/client";
 import { ProductStat } from "../../src/types";
 import { t } from "../../src/i18n";
 import { setAdminPin } from "../../src/services/adminAuth";
+import AdminPinModal from "../../src/components/AdminPinModal";
 
 type Stage = "completed" | "checked";
 
@@ -53,32 +54,6 @@ export default function StatsScreen() {
     // as a route param — on the web build a route param would show up in
     // the address bar and browser history.
     const [pinModalVisible, setPinModalVisible] = useState(false);
-    const [pin, setPin] = useState("");
-    const [pinError, setPinError] = useState<string | null>(null);
-    const [verifyingPin, setVerifyingPin] = useState(false);
-
-    const closePinModal = useCallback(() => {
-        setPinModalVisible(false);
-        setPin("");
-        setPinError(null);
-    }, []);
-
-    const unlockAdmin = useCallback(async () => {
-        setVerifyingPin(true);
-        setPinError(null);
-        try {
-            await apiClient.get("/employees/admin", { headers: { "X-Admin-Pin": pin } });
-            setAdminPin(pin);
-            closePinModal();
-            router.push("/admin/employees");
-        } catch (err: any) {
-            setPinError(
-                err?.response?.status === 401 ? t("stats.adminPinWrong") : t("stats.adminPinError"),
-            );
-        } finally {
-            setVerifyingPin(false);
-        }
-    }, [pin, closePinModal, router]);
 
     const { data, isLoading, isError, refetch, isRefetching } = useQuery<ProductStat[]>({
         queryKey: ["stats", from, to, stage],
@@ -115,34 +90,15 @@ export default function StatsScreen() {
     );
 
     const pinModal = (
-        <Portal>
-            <Modal visible={pinModalVisible} onDismiss={closePinModal} contentContainerStyle={styles.modal}>
-                <Text variant="titleLarge" style={{ marginBottom: 12 }}>
-                    {t("stats.adminPinTitle")}
-                </Text>
-                <TextInput
-                    mode="outlined"
-                    value={pin}
-                    onChangeText={setPin}
-                    secureTextEntry
-                    keyboardType="number-pad"
-                    autoFocus
-                    onSubmitEditing={unlockAdmin}
-                />
-                {pinError && (
-                    <Text style={{ color: "#c62828", marginTop: 8 }}>{pinError}</Text>
-                )}
-                <TouchableOpacity
-                    style={[styles.confirmBtn, (!pin || verifyingPin) && styles.confirmBtnDisabled]}
-                    activeOpacity={0.8}
-                    disabled={!pin || verifyingPin}
-                    onPress={unlockAdmin}>
-                    {verifyingPin ?
-                        <ActivityIndicator size="small" color="#fff" />
-                    :   <Text style={styles.confirmBtnText}>{t("stats.adminUnlock")}</Text>}
-                </TouchableOpacity>
-            </Modal>
-        </Portal>
+        <AdminPinModal
+            visible={pinModalVisible}
+            onDismiss={() => setPinModalVisible(false)}
+            onUnlocked={(pin) => {
+                setPinModalVisible(false);
+                setAdminPin(pin);
+                router.push("/admin/employees");
+            }}
+        />
     );
 
     if (isLoading) {
@@ -218,8 +174,4 @@ const styles = StyleSheet.create({
     row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
     desc: { flex: 1, marginRight: 12 },
     count: { color: "#ff5100", fontWeight: "bold" },
-    modal: { backgroundColor: "#fff", marginHorizontal: 24, borderRadius: 16, padding: 24 },
-    confirmBtn: { backgroundColor: "#ff5100", borderRadius: 10, paddingVertical: 16, alignItems: "center" },
-    confirmBtnDisabled: { backgroundColor: "#f0c4a8" },
-    confirmBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
 });
