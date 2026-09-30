@@ -137,13 +137,11 @@ export default function DocumentViewerScreen() {
     const [manualPin, setManualPin] = useState<string | null>(null);
 
     // ── "Finish order" action ──
-    // Only offered from inside an opened, revisioned document whose order
-    // was closed as anything other than "complete" — i.e. someone has
-    // actually reviewed this document before finishing the order, not just
-    // tapped a button from the overview list.
+    // Offered from inside an opened document (edited or not) whose order
+    // was closed as anything other than "complete", so a "bad" state can be
+    // turned into "complete" — not from the overview list.
     const canFinishOrder =
         !!docMeta &&
-        docMeta.revisioned &&
         !!docMeta.status &&
         NON_COMPLETE_STATUSES.includes(docMeta.status) &&
         !!docMeta.completion;
