@@ -229,13 +229,11 @@
     "manual.alreadyCompleted": "Tento cyklus už je dokončený — potvrzením přidáte nový záznam.",
     "manual.confirm": "Dokončit cyklus {cycle}",
     "manual.success": "Cyklus byl ručně dokončen.",
-    "prepQueue.showPrinted": "Vytištěné",
-    "prepQueue.printedEmpty": "Za posledních 7 dní se nic netisklo.",
-    "prepQueue.printedAt": "Vytištěno",
-    "prepQueue.reprint": "Vytisknout znovu",
     "reprint.title": "Znovu vytisknout štítky",
-    "reprint.hint": "Vyberte vrata, jejichž štítek se vytiskl špatně. Vytisknou se stejně jako původně.",
+    "reprint.hint": "Vyberte čísla vrat, jejichž štítky chcete vytisknout znovu – např. 23 a 24, pokud se poslední dva vytiskly špatně.",
     "reprint.all": "Vybrat vše",
     "reprint.none": "Zrušit výběr",
-    "reprint.confirm": "Vytisknout ({count})"
+    "reprint.confirm": "Vytisknout ({count})",
+    "reprint.alreadyPrinted": "Štítky této zakázky už byly vytištěny {date} ({name}).",
+    "reprint.hintSingle": "Můžete ho vytisknout znovu – stejně jako původně."
 }

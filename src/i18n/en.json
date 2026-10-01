@@ -229,13 +229,11 @@
     "manual.alreadyCompleted": "This cycle is already completed — confirming adds a new record.",
     "manual.confirm": "Complete cycle {cycle}",
     "manual.success": "The cycle was completed manually.",
-    "prepQueue.showPrinted": "Printed",
-    "prepQueue.printedEmpty": "Nothing was printed in the last 7 days.",
-    "prepQueue.printedAt": "Printed",
-    "prepQueue.reprint": "Print again",
     "reprint.title": "Reprint labels",
-    "reprint.hint": "Select the doors whose label printed badly. They print exactly like the original.",
+    "reprint.hint": "Select the door numbers whose labels you want to print again — e.g. 23 and 24 if the last two came out bad.",
     "reprint.all": "Select all",
     "reprint.none": "Clear selection",
-    "reprint.confirm": "Print ({count})"
+    "reprint.confirm": "Print ({count})",
+    "reprint.alreadyPrinted": "The labels for this order were already printed on {date} ({name}).",
+    "reprint.hintSingle": "You can print it again, exactly like the original."
 }

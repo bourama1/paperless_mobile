@@ -22,7 +22,7 @@ import AdminPinModal from "../../src/components/AdminPinModal";
 import ManualCompletionModal from "../../src/components/ManualCompletionModal";
 import { useEmployees } from "../../src/hooks/useEmployees";
 import EmployeePicker from "../../src/components/EmployeePicker";
-import PrepLabelModal from "../../src/components/PrepLabelModal";
+import PrepLabelModal, { usePrepLabelStatus } from "../../src/components/PrepLabelModal";
 import { saveEditedPdfWithRetry, PendingSave } from "../../src/utils/saveEditedPdf";
 
 interface DocumentMeta {
@@ -101,13 +101,22 @@ export default function DocumentViewerScreen() {
             return response.data as DocumentMeta;
         },
     });
-    // The prep-label print action is only ever reachable from the
+    // The first prep-label print is only reachable from the
     // preparation queue tab (see app/(tabs)/prep-queue.tsx) — a worker
     // opens the BOM from there specifically to review what to prepare
     // before printing, so it must not be offered when a document is opened
     // any other way (search, revisions overview, etc). fromPrepQueue is set
     // in the route params only by that screen's navigation.
-    const canPrintLabel = fromPrepQueue === "1" && !!(docMeta?.project_number && docMeta?.position);
+    // Once printed, the order leaves the queue — so an already printed
+    // label stays reachable from the document opened any way, where the
+    // dialog offers reprinting chosen doors (see PrepLabelModal).
+    const { data: prepLabelStatus } = usePrepLabelStatus(
+        docMeta?.project_number ?? "",
+        docMeta?.position ?? "",
+        !!docMeta,
+    );
+    const canPrintLabel =
+        (fromPrepQueue === "1" || !!prepLabelStatus?.printed) && !!(docMeta?.project_number && docMeta?.position);
 
     // ── "Check" (QC) action ──
     // Only offered once the order has actually reached one of the kiosk
