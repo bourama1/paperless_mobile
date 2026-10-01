@@ -19,6 +19,43 @@ interface PrepChecklistItem {
     checked: boolean;
 }
 
+/**
+ * Posts a prep-label print (or reprint) request. If the backend printed
+ * directly to the Godex, it returns {"success":true} — nothing more to do
+ * here. If PREP_LABEL_PRINTER_HOST is not configured on the server it falls
+ * back to returning the raw PDF bytes so the worker can still send it
+ * somewhere manually (share sheet / dev testing).
+ */
+export async function postPrepLabel(url: string, body: { projectNumber: string; position: string; [key: string]: unknown }) {
+    const response = await apiClient.post(url, body, { responseType: "arraybuffer" });
+    const contentType = String(response.headers["content-type"] || "");
+    if (contentType.includes("application/json")) return;
+
+    const filename = `label_${body.projectNumber}_${body.position}.pdf`;
+
+    if (Platform.OS === "web") {
+        const blob = new Blob([response.data], { type: "application/pdf" });
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, "_blank");
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+        return;
+    }
+
+    const base64 = arrayBufferToBase64(response.data);
+    const fileUri = `${cacheDirectory}${filename}`;
+    await writeAsStringAsync(fileUri, base64, { encoding: EncodingType.Base64 });
+
+    if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+            mimeType: "application/pdf",
+            dialogTitle: t("document.printLabel"),
+            UTI: "com.adobe.pdf",
+        });
+    } else {
+        throw new Error(t("document.sharingUnavailable"));
+    }
+}
+
 export interface PrepLabelModalProps {
     visible: boolean;
     onDismiss: () => void;
@@ -122,43 +159,12 @@ export default function PrepLabelModal({
     const printLabel = useMutation({
         mutationFn: async () => {
             if (!selectedEmployee) return;
-            const response = await apiClient.post(
-                "/workstations/print-prep-label",
-                { projectNumber, position, employeeName: selectedEmployee, totalCycles },
-                { responseType: "arraybuffer" },
-            );
-
-            // If the backend printed directly to the Godex, it returns
-            // {"success":true} — nothing more to do on the mobile side.
-            // If PREP_LABEL_PRINTER_HOST is not configured on the server it
-            // falls back to returning the raw PDF bytes so the worker can
-            // still send it somewhere manually (share sheet / dev testing).
-            const contentType = response.headers["content-type"] || "";
-            if (contentType.includes("application/json")) return;
-
-            const filename = `label_${projectNumber}_${position}.pdf`;
-
-            if (Platform.OS === "web") {
-                const blob = new Blob([response.data], { type: "application/pdf" });
-                const url = URL.createObjectURL(blob);
-                window.open(url, "_blank");
-                setTimeout(() => URL.revokeObjectURL(url), 60000);
-                return;
-            }
-
-            const base64 = arrayBufferToBase64(response.data);
-            const fileUri = `${cacheDirectory}${filename}`;
-            await writeAsStringAsync(fileUri, base64, { encoding: EncodingType.Base64 });
-
-            if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(fileUri, {
-                    mimeType: "application/pdf",
-                    dialogTitle: t("document.printLabel"),
-                    UTI: "com.adobe.pdf",
-                });
-            } else {
-                throw new Error(t("document.sharingUnavailable"));
-            }
+            await postPrepLabel("/workstations/print-prep-label", {
+                projectNumber,
+                position,
+                employeeName: selectedEmployee,
+                totalCycles,
+            });
         },
         onSuccess: () => {
             setSelectedEmployee(null);

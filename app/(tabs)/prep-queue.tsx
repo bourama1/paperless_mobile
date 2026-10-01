@@ -8,6 +8,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import apiClient from "../../src/api/client";
 import { t } from "../../src/i18n";
 import PrepLabelModal from "../../src/components/PrepLabelModal";
+import ReprintLabelModal from "../../src/components/ReprintLabelModal";
 import LanguageSwitcher from "../../src/components/LanguageSwitcher";
 
 // Persisted locally (per device) — a personal workflow preference, not a
@@ -28,6 +29,8 @@ interface PrepQueueItem {
     locked?: boolean;
     product_order: string | null;
     hardware_type: string | null;
+    printed_at?: string;
+    printed_cycles?: number;
 }
 
 function formatDate(iso: string): string {
@@ -65,6 +68,11 @@ export default function PrepQueueScreen() {
     const [directPrintMode, setDirectPrintMode] = useState(false);
     const [directPrintItem, setDirectPrintItem] = useState<PrepQueueItem | null>(null);
 
+    // The already printed orders (last few days), for reprinting doors
+    // whose label came out bad — see ReprintLabelModal.
+    const [showPrinted, setShowPrinted] = useState(false);
+    const [reprintItem, setReprintItem] = useState<PrepQueueItem | null>(null);
+
     useEffect(() => {
         AsyncStorage.getItem(DIRECT_PRINT_MODE_KEY)
             .then((stored) => setDirectPrintMode(stored === "1"))
@@ -83,9 +91,9 @@ export default function PrepQueueScreen() {
         refetch,
         isRefetching,
     } = useQuery<{ items: PrepQueueItem[] }>({
-        queryKey: ["prep-queue"],
+        queryKey: ["prep-queue", showPrinted],
         queryFn: async () => {
-            const response = await apiClient.get("/prep-queue");
+            const response = await apiClient.get("/prep-queue", { params: showPrinted ? { printed: "true" } : {} });
             return response.data;
         },
     });
@@ -215,6 +223,15 @@ export default function PrepQueueScreen() {
     return (
         <View style={styles.container}>
             <View style={styles.modeRow}>
+                <Chip
+                    icon="printer-check"
+                    mode={showPrinted ? "flat" : "outlined"}
+                    selected={showPrinted}
+                    onPress={() => setShowPrinted(!showPrinted)}
+                    style={[{ marginRight: "auto" }, showPrinted && styles.filterChipActive]}
+                    textStyle={showPrinted ? styles.filterChipTextSelected : styles.filterChipText}>
+                    {t("prepQueue.showPrinted")}
+                </Chip>
                 <Text variant="bodyMedium">{t("prepQueue.directPrintMode")}</Text>
                 <Switch value={directPrintMode} onValueChange={toggleDirectPrintMode} color="#ff5100" />
             </View>
@@ -307,6 +324,7 @@ export default function PrepQueueScreen() {
                             directPrintMode={directPrintMode}
                             isOpening={openBom.isPending && openBom.variables?.id === item.id}
                             disabled={openBom.isPending || item.locked === true}
+                            onReprint={showPrinted ? () => setReprintItem(item) : undefined}
                             onPrepare={() => {
                                 if (directPrintMode) {
                                     // Skips the PDF viewer, but import-pbom's
@@ -332,7 +350,7 @@ export default function PrepQueueScreen() {
                     )}
                 />
             :   <View style={styles.center}>
-                    <Text variant="bodyLarge">{t("prepQueue.empty")}</Text>
+                    <Text variant="bodyLarge">{t(showPrinted ? "prepQueue.printedEmpty" : "prepQueue.empty")}</Text>
                 </View>
             }
 
@@ -342,6 +360,13 @@ export default function PrepQueueScreen() {
                 projectNumber={directPrintItem?.project_number ?? ""}
                 position={directPrintItem?.position ?? ""}
                 totalCycles={directPrintItem?.quantity ?? 1}
+            />
+            <ReprintLabelModal
+                visible={!!reprintItem}
+                onDismiss={() => setReprintItem(null)}
+                projectNumber={reprintItem?.project_number ?? ""}
+                position={reprintItem?.position ?? ""}
+                totalCycles={reprintItem?.printed_cycles ?? reprintItem?.quantity ?? 1}
             />
 
             <Snackbar
@@ -360,12 +385,15 @@ function PrepQueueCard({
     isOpening,
     disabled,
     onPrepare,
+    onReprint,
 }: {
     item: PrepQueueItem;
     directPrintMode: boolean;
     isOpening: boolean;
     disabled: boolean;
     onPrepare: () => void;
+    /** Set in the "printed" view — the card's button reprints instead. */
+    onReprint?: (() => void) | undefined;
 }) {
     const isLocked = item.locked === true;
     return (
@@ -430,6 +458,22 @@ function PrepQueueCard({
                         <Text variant="bodySmall">{item.plan_label}</Text>
                     </View>
                 )}
+                {item.printed_at && (
+                    <View style={styles.metaRow}>
+                        <Text variant="bodySmall" style={styles.metaLabel}>
+                            {t("prepQueue.printedAt")}
+                        </Text>
+                        <Text variant="bodySmall">
+                            {new Date(item.printed_at).toLocaleString("cs-CZ", {
+                                timeZone: "Europe/Prague",
+                                day: "numeric",
+                                month: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                            })}
+                        </Text>
+                    </View>
+                )}
                 {item.product_order && (
                     <View style={styles.metaRow}>
                         <Text variant="bodySmall" style={styles.metaLabel}>
@@ -449,7 +493,7 @@ function PrepQueueCard({
                     ]}
                     activeOpacity={0.8}
                     disabled={disabled || isLocked}
-                    onPress={onPrepare}>
+                    onPress={onReprint ?? onPrepare}>
                     {isOpening ?
                         <ActivityIndicator size="small" color="#fff" />
                     : isLocked ?
@@ -458,7 +502,9 @@ function PrepQueueCard({
                             <Text style={styles.confirmBtnText}>{t("prepQueue.locked")}</Text>
                         </View>
                     :   <Text style={styles.confirmBtnText}>
-                            {directPrintMode ? t("prepQueue.prepare") : t("prepQueue.openBom")}
+                            {onReprint ? t("prepQueue.reprint")
+                            : directPrintMode ? t("prepQueue.prepare")
+                            : t("prepQueue.openBom")}
                         </Text>
                     }
                 </TouchableOpacity>

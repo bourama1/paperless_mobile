@@ -228,5 +228,14 @@
     "manual.cycle": "Цикл (усього {total})",
     "manual.alreadyCompleted": "Цей цикл уже завершено — підтвердження додасть новий запис.",
     "manual.confirm": "Завершити цикл {cycle}",
-    "manual.success": "Цикл завершено вручну."
+    "manual.success": "Цикл завершено вручну.",
+    "prepQueue.showPrinted": "Надруковані",
+    "prepQueue.printedEmpty": "За останні 7 днів нічого не друкувалося.",
+    "prepQueue.printedAt": "Надруковано",
+    "prepQueue.reprint": "Надрукувати знову",
+    "reprint.title": "Повторний друк етикеток",
+    "reprint.hint": "Виберіть ворота, етикетка яких надрукувалася погано. Вони надрукуються так само, як оригінал.",
+    "reprint.all": "Вибрати все",
+    "reprint.none": "Скасувати вибір",
+    "reprint.confirm": "Надрукувати ({count})"
 }
