@@ -57,6 +57,8 @@ export async function postPrepLabel(url: string, body: { projectNumber: string; 
 }
 
 export interface PrepLabelStatus {
+    // Door count from the PTL order file — the server prints this many; null if unknown.
+    doors: number | null;
     printed: { employeeName: string; printedAt: string; totalCycles: number } | null;
 }
 
@@ -114,6 +116,7 @@ export default function PrepLabelModal({
     const [snackbar, setSnackbar] = useState({ visible: false, message: "" });
     const { data: employees } = useEmployees(visible);
     const { data: status, isLoading: statusLoading } = usePrepLabelStatus(projectNumber, position, visible);
+    const doorCount = status?.doors ?? totalCycles;
 
     // Same idea as motorOrderService's isNonPtlOrder check on the backend,
     // but per item: an order's items that don't appear in parts.xlsx have
@@ -186,7 +189,7 @@ export default function PrepLabelModal({
                 projectNumber,
                 position,
                 employeeName: selectedEmployee,
-                totalCycles,
+                totalCycles: doorCount,
             });
         },
         onSuccess: () => {
@@ -232,9 +235,9 @@ export default function PrepLabelModal({
                     <Text variant="bodyMedium" style={{ color: "#666", marginBottom: 16 }}>
                         {t("document.printLabelHint")}
                     </Text>
-                    {totalCycles > 1 && (
+                    {doorCount > 1 && (
                         <Text variant="bodyMedium" style={styles.doorCount}>
-                            {t("document.printLabelDoorCount", { count: totalCycles })}
+                            {t("document.printLabelDoorCount", { count: doorCount })}
                         </Text>
                     )}
                     {prepChecklistLoading && <ActivityIndicator size="small" style={{ marginVertical: 12 }} />}
