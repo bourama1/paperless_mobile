@@ -235,5 +235,11 @@
     "reprint.none": "Zrušit výběr",
     "reprint.confirm": "Vytisknout ({count})",
     "reprint.alreadyPrinted": "Štítky této zakázky už byly vytištěny {date} ({name}).",
-    "reprint.hintSingle": "Můžete ho vytisknout znovu – stejně jako původně."
+    "reprint.hintSingle": "Můžete ho vytisknout znovu – stejně jako původně.",
+    "search.printDocs": "Tisk dokumentace",
+    "search.printDocsConfirm": "Vytisknout dokumentaci zakázky {order}, pozice {position}? Vytiskne se znovu, i když už vytištěná byla.",
+    "search.printDocsButton": "Vytisknout",
+    "search.printDocsSent": "Dokumentů odesláno na tiskárnu: {count}",
+    "search.printDocsNone": "Pro tuto pozici nejsou v doc manageru žádné dokumenty k tisku.",
+    "search.printDocsError": "Tisk dokumentace se nezdařil: {msg}"
 }

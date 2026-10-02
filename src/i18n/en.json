@@ -235,5 +235,11 @@
     "reprint.none": "Clear selection",
     "reprint.confirm": "Print ({count})",
     "reprint.alreadyPrinted": "The labels for this order were already printed on {date} ({name}).",
-    "reprint.hintSingle": "You can print it again, exactly like the original."
+    "reprint.hintSingle": "You can print it again, exactly like the original.",
+    "search.printDocs": "Print documentation",
+    "search.printDocsConfirm": "Print the documentation for order {order}, position {position}? It prints again even if it was already printed.",
+    "search.printDocsButton": "Print",
+    "search.printDocsSent": "Documents sent to the printer: {count}",
+    "search.printDocsNone": "doc manager has no documents to print for this position.",
+    "search.printDocsError": "Failed to print documentation: {msg}"
 }

@@ -235,5 +235,11 @@
     "reprint.none": "Скасувати вибір",
     "reprint.confirm": "Надрукувати ({count})",
     "reprint.alreadyPrinted": "Етикетки цього замовлення вже надруковано {date} ({name}).",
-    "reprint.hintSingle": "Її можна надрукувати знову — так само, як оригінал."
+    "reprint.hintSingle": "Її можна надрукувати знову — так само, як оригінал.",
+    "search.printDocs": "Друк документації",
+    "search.printDocsConfirm": "Надрукувати документацію замовлення {order}, позиція {position}? Вона надрукується знову, навіть якщо вже була надрукована.",
+    "search.printDocsButton": "Надрукувати",
+    "search.printDocsSent": "Документів надіслано на принтер: {count}",
+    "search.printDocsNone": "У doc manager немає документів для друку для цієї позиції.",
+    "search.printDocsError": "Не вдалося надрукувати документацію: {msg}"
 }

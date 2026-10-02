@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { FlatList, View, StyleSheet, TouchableOpacity, ActivityIndicator, Keyboard } from "react-native";
-import { Card, Text, TextInput, Divider, Snackbar } from "react-native-paper";
+import { Card, Text, TextInput, Divider, Snackbar, Portal, Dialog, Button } from "react-native-paper";
 import { Ionicons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import apiClient from "../../src/api/client";
 import { t } from "../../src/i18n";
 import { useBarcodeScan } from "../../src/hooks/useBarcodeScan";
@@ -29,6 +29,28 @@ export default function SearchScreen() {
             return response.data;
         },
         enabled: false,
+    });
+
+    // Print (or reprint) the order's documentation — the doc_manager
+    // documents the STARTED flow prints, even when already printed.
+    const [printItem, setPrintItem] = useState<OrderCodeResult | null>(null);
+    const [printSnackbar, setPrintSnackbar] = useState("");
+    const printDocs = useMutation({
+        mutationFn: async (item: OrderCodeResult) => {
+            const response = await apiClient.post("/workstations/print-documents", {
+                projectNumber: String(item.order_code),
+                position: String(item.position_code),
+            });
+            return response.data as { found: number };
+        },
+        onSuccess: ({ found }) => {
+            setPrintItem(null);
+            setPrintSnackbar(found > 0 ? t("search.printDocsSent", { count: found }) : t("search.printDocsNone"));
+        },
+        onError: (error: any) => {
+            setPrintItem(null);
+            setPrintSnackbar(t("search.printDocsError", { msg: error?.response?.data?.error || error.message }));
+        },
     });
 
     const handleSearch = () => {
@@ -115,6 +137,15 @@ export default function SearchScreen() {
                                                 {item.locked && (
                                                     <Ionicons name="lock-closed" size={18} color="#c62828" />
                                                 )}
+                                                {!item.locked && (
+                                                    <TouchableOpacity
+                                                        onPress={() => setPrintItem(item)}
+                                                        hitSlop={8}
+                                                        style={styles.printBtn}
+                                                        accessibilityLabel={t("search.printDocs")}>
+                                                        <Ionicons name="print-outline" size={22} color="#ff5100" />
+                                                    </TouchableOpacity>
+                                                )}
                                                 <Ionicons name="chevron-forward" size={20} color="#ccc" />
                                             </View>
                                     }
@@ -166,6 +197,36 @@ export default function SearchScreen() {
 
             <Snackbar visible={order.snackbar.visible} onDismiss={order.snackbar.onDismiss}>
                 {order.snackbar.message}
+            </Snackbar>
+
+            <Portal>
+                <Dialog visible={!!printItem} onDismiss={() => !printDocs.isPending && setPrintItem(null)}>
+                    <Dialog.Title>{t("search.printDocs")}</Dialog.Title>
+                    <Dialog.Content>
+                        <Text variant="bodyMedium">
+                            {t("search.printDocsConfirm", {
+                                order: printItem?.order_code ?? "",
+                                position: printItem?.position_code ?? "",
+                            })}
+                        </Text>
+                    </Dialog.Content>
+                    <Dialog.Actions>
+                        <Button onPress={() => setPrintItem(null)} disabled={printDocs.isPending}>
+                            {t("search.cancel")}
+                        </Button>
+                        <Button
+                            mode="contained"
+                            buttonColor="#ff5100"
+                            loading={printDocs.isPending}
+                            disabled={printDocs.isPending}
+                            onPress={() => printItem && printDocs.mutate(printItem)}>
+                            {t("search.printDocsButton")}
+                        </Button>
+                    </Dialog.Actions>
+                </Dialog>
+            </Portal>
+            <Snackbar visible={!!printSnackbar} onDismiss={() => setPrintSnackbar("")} duration={4000}>
+                {printSnackbar}
             </Snackbar>
         </View>
     );
@@ -227,6 +288,7 @@ const styles = StyleSheet.create({
         fontWeight: "600",
     },
     list: { padding: 12 },
+    printBtn: { padding: 4 },
     card: { marginBottom: 12 },
     cardLocked: {
         borderColor: "#ef9a9a",
